@@ -7,19 +7,23 @@ $EnvSettings = $(ConvertFrom-StringData -StringData (Get-Content (Join-Path "." 
 
 $SSC_APP_NAME = $EnvSettings['SSC_APP_NAME']
 $SSC_APP_VER_NAME = $EnvSettings['SSC_APP_VER_NAME']
+$SCANCENTRAL_CTRL_TOKEN = $EnvSettings['SCANCENTRAL_CTRL_TOKEN']
 
 if ([string]::IsNullOrEmpty($SSC_APP_NAME)) { $SSC_APP_NAME = "FortifyDemoApp" }
 if ([string]::IsNullOrEmpty($SSC_APP_VER_NAME)) { $SSC_APP_VER_NAME = "1.0" }
+if ([string]::IsNullOrEmpty($SSC_APP_VER_NAME)) { throw "Please enter a value for SCANCENTRAL_CTRL_TOKEN in the .env file" }
 
+# Change the below to your preferred JVM
 $Env:JAVA_HOME = "$($PSScriptRoot)\openjdk-jre-11.0.18\"
+# ScanCentral Client should have been installed by fcli in "populate.ps1"
 $Env:PATH = "$($Env:JAVA_HOME)\bin;$($PSScriptRoot)\scancentral_client\bin;$Env:PATH"
 
 # Importing certificates
-keytool -importkeystore -srckeystore "$($PSScriptRoot)\certificates\keystore.p12" -srcstoretype pkcs12 -destkeystore "$($Env:JAVA_HOME)\lib\security\cacerts" -srcstorepass changeme -deststorepass changeit -noprompt
+& "$($Env:JAVA_HOME)\bin\keytool" -importkeystore -srckeystore "$($PSScriptRoot)\certificates\keystore.p12" -srcstoretype pkcs12 -destkeystore "$($Env:JAVA_HOME)\lib\security\cacerts" -srcstorepass changeme -deststorepass changeit -noprompt
 
 # Package, upload and run the scan and import results into SSC
 Write-Host Invoking ScanCentral SAST ...
-& scancentral -url $Env:FCLI_DEFAULT_SCSAST_URL start -upload -uptoken $Env:FCLI_DEFAULT_SSC_CI_TOKEN `
+& scancentral -url $Env:FCLI_DEFAULT_SCSAST_URL start -upload -uptoken $SCANCENTRAL_CTRL_TOKEN `
     -b $SSC_APP_NAME -application $SSC_APP_NAME -version $SSC_APP_VER_NAME -p .\samples\package.zip `
     -block -o -f "$($SSC_APP_NAME).fpr"
 

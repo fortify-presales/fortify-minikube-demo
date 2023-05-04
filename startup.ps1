@@ -188,6 +188,7 @@ $Env:PATH = "$($PSScriptRoot)\fcli;$($PSScriptRoot)\scancentral-client\bin;$Env:
 
 function jfcli { java -jar .\fcli\fcli.jar $args }
 
+Write-Host "Installing Scancentral Client..."
 jfcli tool scancentral-client install -d "$($PSScriptRoot)\scancentral_client" -y -t $ClientAuthToken
 jfcli tool scancentral-client uninstall -y
 
@@ -195,9 +196,9 @@ Write-Host ""
 Write-Host "================================================================================"
 Write-Host "Software Security Center URL: https://$($SSCUrl)"
 Write-Host "ScanCentral Controller URL: https://$($SCSASTUrl)/scancentral-ctrl/"
-Write-Host "ScanCentral Controller Shared Secret: $ScanCentralCtrlSecret"
 Write-Host "Client Authentication Token: $ClientAuthToken"
 Write-Host "Worker Authentication Token: $WorkerAuthToken"
+Write-Host "ScanCentral Controller Shared Secret: $ScanCentralCtrlSecret"
 Write-Host
 Write-Host "After Enabling ScanCentral SAST/DAST from SSC restart with:"
 Write-Host ""
