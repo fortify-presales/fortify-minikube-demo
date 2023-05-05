@@ -50,15 +50,12 @@ You must obtain the image, including the SecureBase, from other channels.
 Create a `.env` file with settings that you wish to you, an example file is given below:
 
 ```aidl
-# minikube settings
-MINIKUBE_MEM=10240
-MINIKUBE_CPUS=4
 # Default SSC Admin User
 SSC_ADMIN_USER=admin
 SSC_ADMIN_PASSWORD=admin
 # DockerHub login credentials to fortifydocker organisation
-DOCKERHUB_USERNAME=**ENTER_YOUR_DOCKER_USERNAME*
-DOCKERHUB_PASSWORD=**ENTER_YOUR_DOCKER_PASSWORD**
+DOCKERHUB_USERNAME=_YOUR_DOCKERHUB_LOGIN_
+DOCKERHUB_PASSWORD=_YOUR_DOCKERHUB_PASSWORD_
 # Path to openssl - use OpenSSL from Git on Windows
 OPENSSL_PATH=C:\\Program Files\\Git\\mingw64\\bin\\openssl.exe
 # Version on ScanCentral to use
@@ -66,6 +63,15 @@ SCANCENTRAL_VERSION=22.2.0
 # Fortify Demo App to create
 SSC_APP_NAME=FortifyDemoApp
 SSC_APP_VER_NAME=1.0
+# LIM configuration
+LIM_API_URL=http://_YOUR_LIM_SERVER_/LIM.API
+LIM_ADMIN_USER=admin
+LIM_ADMIN_PASSWORD=_YOUR_LIM_ADMIN_PASSWORD_
+LIM_POOL_NAME=Default
+LIM_POOL_PASSWORD=_YOUR_LIM_POOL_PASSWORD_
+# ScanCentral DAST Upgrade repo
+SCDAST_UPGRADE_REPO=_YOUR_UPGRADE_REPO_
+SCDAST_UPGRADE_REPO_VER=22.2
 # Version of Helm charts to ise
 SSC_HELM_VERSION=1.1.2221008
 SCSAST_HELM_VERSION=22.2.0
@@ -80,10 +86,11 @@ Note: Do not place this file in source control.
 Run the following command to start minikube and create a Fortify Environment:
 
 ```aidl
-.\startup.ps1
+.\startup.ps1 -Components All
 ```
 
-It will take a while for everything to complete.
+It will take a while for everything to complete. You can specify the Fortify "components"
+to install with the `-Components` option, e.g. `All`, `SSC`, `SCSAST` or `SCDAST`.
 
 Once the details of the environment are complete at the end you will need to login to Fortify
 SSC and enter the details of ScanCentral SAST/DAST as per the instructions.
