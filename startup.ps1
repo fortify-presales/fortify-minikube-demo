@@ -69,6 +69,7 @@ if ($Components.Count -gt 0 -and ($Components.Contains("All") -or $Components.Co
 }
 
 function kubectl { minikube kubectl -- $args }
+function fcli { java -jar .\fcli\fcli.jar $args }
 
 # check if minikube is running
 $MinikubeStatus = (minikube status --format='{{.Host}}')
@@ -115,7 +116,7 @@ else
 
     & "$OPENSSL_PATH" req -newkey rsa:2048 -nodes -keyout key.pem -x509 -days 365 -out certificate.pem -subj $CertUrl
 
-    kubectl create secret tls wildcard-certificate --cert = certificate.pem --key = key.pem
+    kubectl create secret tls wildcard-certificate --cert=certificate.pem --key=key.pem
 
     & "$OPENSSL_PATH" pkcs12 -export -name ssc -in certificate.pem -inkey key.pem -out keystore.p12 -password pass:changeme
 
@@ -201,7 +202,7 @@ if ($Components.Count -gt 0 -and ($Components.Contains("All") -or $Components.Co
         --set-file fortifyLicense=fortify.license `
         --set controller.thisUrl="https://$($SCSASTUrl)/scancentral-ctrl" `
         --set controller.sscUrl="https://$($SSCUrl)" `
-        --set-file controller.trustedCertificates[0]=certificates/certificate.pem `
+        --set-file trustedCertificates[0]=certificates/certificate.pem `
         --set controller.persistence.enabled=false `
         --set controller.ingress.enabled=true `
         --set controller.ingress.hosts[0].host="$($SCSASTUrl)" `
@@ -232,8 +233,8 @@ if ($Components.Count -gt 0 -and ($Components.Contains("All") -or $Components.Co
     Write-Host "Installing ScanCentral DAST ..."
     & helm install scancentral-dast fortify/scancentral-dast --version $SCDAST_HELM_VERSION --timeout 40m `
         --set imagePullSecrets[0].name=fortifydocker `
-        --set images.upgradeJob.repository="$($SCDAST_UPGRADE_REPO)" `
-        --set images.upgradeJob.tag="$($SCDAST_UPGRADE_REPO_VER)" `
+        --set images.upgradeJob.repository="$( $SCDAST_UPGRADE_REPO )" `
+        --set images.upgradeJob.tag="$( $SCDAST_UPGRADE_REPO_VER )" `
         --set configuration.databaseSettings.databaseProvider=PostgreSQL `
         --set configuration.databaseSettings.server=postgresql `
         --set configuration.databaseSettings.database=scdast_db `
@@ -242,38 +243,38 @@ if ($Components.Count -gt 0 -and ($Components.Contains("All") -or $Components.Co
         --set configuration.databaseSettings.standardDatabaseAccount.username=postgres `
         --set configuration.databaseSettings.standardDatabaseAccount.password=password `
         --set configuration.serviceToken=thisisaservicetoken `
-        --set configuration.sSCSettings.sSCRootUrl="https://$($SSCUrl)" `
-        --set configuration.sSCSettings.serviceAccountUserName="$($SSC_ADMIN_USER)" `
-        --set configuration.sSCSettings.serviceAccountPassword="$($SSC_ADMIN_PASSWORD)" `
-        --set configuration.dASTApiSettings.corsOrigins[0]="https://$($SSCUrl)" `
-        --set configuration.dASTApiSettings.corsOrigins[1]="https://$($SCDASTAPIUrl)" `
-        --set configuration.lIMSettings.limUrl="$($LIM_API_URL)" `
-        --set configuration.lIMSettings.serviceAccountUserName="$($LIM_ADMIN_USER)" `
-        --set configuration.lIMSettings.serviceAccountPassword="$($LIM_ADMIN_PASSWORD)" `
-        --set configuration.lIMSettings.defaultLimPoolName="$($LIM_POOL_NAME)" `
-        --set configuration.lIMSettings.defaultLimPoolPassword="$($LIM_POOL_PASSWORD)" `
+        --set configuration.sSCSettings.sSCRootUrl="https://$( $SSCUrl )" `
+        --set configuration.sSCSettings.serviceAccountUserName="$( $SSC_ADMIN_USER )" `
+        --set configuration.sSCSettings.serviceAccountPassword="$( $SSC_ADMIN_PASSWORD )" `
+        --set configuration.dASTApiSettings.corsOrigins[0]="https://$( $SSCUrl )" `
+        --set configuration.dASTApiSettings.corsOrigins[1]="https://$( $SCDASTAPIUrl )" `
+        --set configuration.lIMSettings.limUrl="$( $LIM_API_URL )" `
+        --set configuration.lIMSettings.serviceAccountUserName="$( $LIM_ADMIN_USER )" `
+        --set configuration.lIMSettings.serviceAccountPassword="$( $LIM_ADMIN_PASSWORD )" `
+        --set configuration.lIMSettings.defaultLimPoolName="$( $LIM_POOL_NAME )" `
+        --set configuration.lIMSettings.defaultLimPoolPassword="$( $LIM_POOL_PASSWORD )" `
         --set configuration.lIMSettings.useLimRestApi=true `
         --set ingress.api.enabled=true `
-        --set ingress.api.hosts[0].host="$($SCDASTAPIUrl)" `
+        --set ingress.api.hosts[0].host="$( $SCDASTAPIUrl )" `
         --set ingress.api.hosts[0].paths[0].path=/ `
         --set ingress.api.hosts[0].paths[0].pathType=Prefix `
         --set ingress.api.tls[0].secretName=wildcard-certificate `
-        --set ingress.api.tls[0].hosts[0]="$($SCDASTAPIUrl)"
+        --set ingress.api.tls[0].hosts[0]="$( $SCDASTAPIUrl )"
 
     Start-Sleep -Seconds 10
+
+    # get running environment
+
+    $ClientAuthTokenBase64 = (kubectl get secret scancentral-sast -o jsonpath="{.data.scancentral-client-auth-token}")
+    $ClientAuthToken = [System.Text.Encoding]::ASCII.GetString([System.Convert]::FromBase64String($ClientAuthTokenBase64))
+    $WorkerAuthTokenBase64 = (kubectl get secret scancentral-sast -o jsonpath="{.data.scancentral-worker-auth-token}")
+    $WorkerAuthToken = [System.Text.Encoding]::ASCII.GetString([System.Convert]::FromBase64String($WorkerAuthTokenBase64))
+    $ScanCentralCtrlSecretBase64 = (kubectl get secret scancentral-sast -o jsonpath="{.data.scancentral-ssc-scancentral-ctrl-secret}")
+    $ScanCentralCtrlSecret = [System.Text.Encoding]::ASCII.GetString([System.Convert]::FromBase64String($ScanCentralCtrlSecretBase64))
+
+    Write-Host "Installing Scancentral Client ..."
+    fcli tool scancentral-client install -d "$( $PSScriptRoot )\scancentral_client" -y -t $ClientAuthToken $SCANCENTRAL_VERSION
 }
-
-# get running environment
-
-$ClientAuthTokenBase64 = (kubectl get secret scancentral-sast -o jsonpath="{.data.scancentral-client-auth-token}")
-$ClientAuthToken = [System.Text.Encoding]::ASCII.GetString([System.Convert]::FromBase64String($ClientAuthTokenBase64))
-$WorkerAuthTokenBase64 = (kubectl get secret scancentral-sast -o jsonpath="{.data.scancentral-worker-auth-token}")
-$WorkerAuthToken = [System.Text.Encoding]::ASCII.GetString([System.Convert]::FromBase64String($WorkerAuthTokenBase64))
-$ScanCentralCtrlSecretBase64 = (kubectl get secret scancentral-sast -o jsonpath="{.data.scancentral-ssc-scancentral-ctrl-secret}")
-$ScanCentralCtrlSecret = [System.Text.Encoding]::ASCII.GetString([System.Convert]::FromBase64String($ScanCentralCtrlSecretBase64))
-
-Write-Host "Installing Scancentral Client ..."
-jfcli tool scancentral-client install -d "$($PSScriptRoot)\scancentral_client" -y -t $ClientAuthToken
 
 Write-Host "Setting Fortify Environment for minikube ..."
 # uncomment to use local JRE
@@ -281,8 +282,6 @@ Write-Host "Setting Fortify Environment for minikube ..."
 $Env:PATH = "$($PSScriptRoot)\fcli;$($PSScriptRoot)\scancentral-client\bin;$Env:PATH"
 # uncomment to use local JRE
 #$Env:PATH = "$($Env:JAVA_HOME)\bin;$($PSScriptRoot)\fcli;$($PSScriptRoot)\scancentral-client\bin;$Env:PATH"
-
-function jfcli { java -jar .\fcli\fcli.jar $args }
 
 $Env:FCLI_HOME="$($PSScriptRoot)\fcli"
 
@@ -306,10 +305,10 @@ Client Authentication Token: $($ClientAuthToken)
 Worker Authentication Token: $($WorkerAuthToken)
 ScanCentral Controller Shared Secret: $($ScanCentralCtrlSecret)
 
-After Enabling ScanCentral SAST/DAST from SSC restart SSC pod with:"
+After Enabling ScanCentral SAST/DAST from SSC restart SSC pod with:
 
-minikube kubectl -- delete pod ssc-webapp-0"
+minikube kubectl -- delete pod ssc-webapp-0
 
-================================================================================"
+================================================================================
 "@
 
