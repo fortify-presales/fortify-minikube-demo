@@ -1,4 +1,4 @@
-# Example script to start minikube on Windows (Hyoer-V) and install Fortify ScanCentral SAST/DAST
+# Example script to start minikube on Windows (Hyper-V) and install Fortify ScanCentral SAST/DAST
 
 # Parameters
 param (
