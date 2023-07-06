@@ -1,4 +1,4 @@
-# Example script to start minikube on Windows (Hyper-V) and install Fortify ScanCentral SAST/DAST
+# Example script to start minikube and install Fortify ScanCentral SAST/DAST
 
 # Parameters
 param (
@@ -9,8 +9,15 @@ param (
     [switch]$SkipCertificates
 )
 
+if ($Components.Count -eq 0) { throw "No components to install" }
+$InstallAll = $Components.Contains("All")
+$InstallSSC = $Components.Contains("SSC")
+$InstallSCSAST = $Components.Contains("SCSAST")
+$InstallSCDAST = $Components.Contains("SCDAST")
+
 # Import some supporting functions
-Import-Module $PSScriptRoot\modules\FortifyFunctions.psm1
+Import-Module $PSScriptRoot\modules\FortifyFunctions.psm1 -Scope Global -Force
+Set-PSPlatform
 
 # Import local environment specific settings
 $EnvSettings = $(ConvertFrom-StringData -StringData (Get-Content (Join-Path "." -ChildPath ".env") | Where-Object {-not ($_.StartsWith('#'))} | Out-String))
@@ -21,7 +28,7 @@ $SSC_ADMIN_USER = $EnvSettings['SSC_ADMIN_USER']
 $SSC_ADMIN_PASSWORD = $EnvSettings['SSC_ADMIN_PASSWORD']
 $DOCKERHUB_USERNAME = $EnvSettings['DOCKERHUB_USERNAME']
 $DOCKERHUB_PASSWORD = $EnvSettings['DOCKERHUB_PASSWORD']
-$OPENSSL_PATH = $EnvSettings['OPENSSL_PATH']
+$OPENSSL = $EnvSettings['OPENSSL_PATH']
 $SCANCENTRAL_VERSION = $EnvSettings['SCANCENTRAL_VERSION']
 $SSC_HELM_VERSION = $EnvSettings['SSC_HELM_VERSION']
 $SCSAST_HELM_VERSION = $EnvSettings['SCSAST_HELM_VERSION']
@@ -48,7 +55,7 @@ if ([string]::IsNullOrEmpty($SCSAST_HELM_VERSION)) { $SCSAST_HELM_VERSION = "22.
 if ([string]::IsNullOrEmpty($SCDAST_HELM_VERSION)) { $SCDAST_HELM_VERSION = "22.2.1" }
 if ([string]::IsNullOrEmpty($MYSQL_HELM_VERSION)) { $MYSQL_HELM_VERSION = "9.3.1" }
 if ([string]::IsNullOrEmpty($POSTGRES_HELM_VERSION)) { $POSTGRES_HELM_VERSION = "11.9.0" }
-if ([string]::IsNullOrEmpty($OPENSSL_PATH)) { $OPENSSL_PATH= "openssl" }
+if ([string]::IsNullOrEmpty($OPENSSL)) { $OPENSSL = "openssl" }
 if ($Components.Count -gt 0 -and ($Components.Contains("All") -or $Components.Contains("SSC")))
 {
     # any other required SSC settings
@@ -69,7 +76,12 @@ if ($Components.Count -gt 0 -and ($Components.Contains("All") -or $Components.Co
 }
 
 function kubectl { minikube kubectl -- $args }
-function fcli { java -jar .\fcli\fcli.jar $args }
+$FcliJar = Join-Path $PSScriptRoot -ChildPath "fcli" | Join-Path -ChildPath "fcli.jar"
+
+
+# Setup Java Environment and Tools
+Set-JavaTools
+$KeyToolExe = Join-Path $JavaBin -ChildPath "keytool"
 
 # check if minikube is running
 $MinikubeStatus = (minikube status --format='{{.Host}}')
@@ -80,7 +92,7 @@ if ($MinikubeStatus -eq "Running")
 else
 {
     Write-Host "minikube not running ... starting ..."
-    & minikube start --memory $MINIKUBE_MEM --cpus $MINIKUBE_CPUS
+    & minikube start --memory $MINIKUBE_MEM --cpus $MINIKUBE_CPUS #--driver docker --static-ip 192.168.200.200
     Start-Sleep -Seconds 5
     & minikube addons enable ingress
     Write-Host "minikube is running ..."
@@ -97,7 +109,7 @@ $CertUrl = "/CN=*.$($MinikubeIP.Replace('.','-')).nip.io"
 kubectl delete secret docker-registry fortifydocker --ignore-not-found
 kubectl create secret docker-registry fortifydocker --docker-username $DOCKERHUB_USERNAME --docker-password $DOCKERHUB_PASSWORD
 
-$CertDir = "$($PSScriptRoot)\certificates"
+$CertDir = Join-Path $PSScriptRoot -ChildPath "certificates"
 if ($SkipCertificates)
 {
     Write-Host "Reusing existing certificates ..."
@@ -114,23 +126,27 @@ else
 
     Set-Location $CertDir
 
-    & "$OPENSSL_PATH" req -newkey rsa:2048 -nodes -keyout key.pem -x509 -days 365 -out certificate.pem -subj $CertUrl
+    & "$OPENSSL" req -newkey rsa:2048 -nodes -keyout key.pem -x509 -days 365 -out certificate.pem -subj $CertUrl
 
     kubectl create secret tls wildcard-certificate --cert=certificate.pem --key=key.pem
 
-    & "$OPENSSL_PATH" pkcs12 -export -name ssc -in certificate.pem -inkey key.pem -out keystore.p12 -password pass:changeme
+    & "$OPENSSL" pkcs12 -export -name ssc -in certificate.pem -inkey key.pem -out keystore.p12 -password pass:changeme
 
-    & keytool -importkeystore -destkeystore ssc-service.jks -srckeystore keystore.p12 -srcstoretype pkcs12 -alias ssc -srcstorepass changeme -deststorepass changeme
+    & "$KeyToolExe" -importkeystore -destkeystore ssc-service.jks -srckeystore keystore.p12 -srcstoretype pkcs12 -alias ssc -srcstorepass changeme -deststorepass changeme
 
-    & keytool -import -trustcacerts -file certificate.pem -alias "wildcard-cert" -keystore truststore -storepass changeme -noprompt
+    & "$KeyToolExe"  -import -trustcacerts -file certificate.pem -alias "wildcard-cert" -keystore truststore -storepass changeme -noprompt
 
-    keytool -importkeystore -srckeystore "$($PSScriptRoot)\certificates\keystore.p12" -srcstoretype pkcs12 -destkeystore "$( $Env:JAVA_HOME )\lib\security\cacerts" -srcstorepass changeme -deststorepass changeit -noprompt
+    $SRCKEYSTORE = Join-Path $PSScriptRoot -ChildPath "certificates" | Join-Path -ChildPath "keystore.p12"
+    $DESTKEYSTORE = Join-Path $JavaHome -ChildPath "lib" | Join-Path -ChildPath "security" | Join-Path -ChildPath "cacerts"
+    & "$KeyToolExe"  -importkeystore -srckeystore $SRCKEYSTORE -srcstoretype pkcs12 -destkeystore $DESTKEYSTORE -srcstorepass changeme -deststorepass changeit -noprompt
 
     Set-Location $PSScriptRoot
 }
 
-if ($Components.Count -gt 0 -and ($Components.Contains("All") -or $Components.Contains("SSC")))
+if ($InstallAll -or $InstallSSC)
 {
+
+    # check if MySql is already running
     $MysqlStatus = (kubectl get pods -n default mysql-0 -o jsonpath="{.status.phase}")
     if ($MysqlStatus -eq "Running")
     {
@@ -145,17 +161,17 @@ if ($Components.Count -gt 0 -and ($Components.Contains("All") -or $Components.Co
 
     Write-Host "Installing SSC ..."
 
-    $SSCSecretDir = "$($PSScriptRoot)\ssc-secret"
+    $SSCSecretDir = Join-Path $PSScriptRoot -ChildPath "ssc-secret"
     If ((Test-Path -PathType container $SSCSecretDir))
     {
         Remove-Item -LiteralPath $SSCSecretDir -Force -Recurse
     }
     New-Item -ItemType Directory -Path $SSCSecretDir
 
-    Copy-Item "$($PSScriptRoot)\ssc.autoconfig" -Destination $SSCSecretDir
-    Copy-Item "$($PSScriptRoot)\fortify.license" -Destination $SSCSecretDir
-    Copy-Item "$($CertDir)\ssc-service.jks" -Destination $SSCSecretDir
-    Copy-Item "$($CertDir)\truststore" -Destination $SSCSecretDir
+    Join-Path $PSScriptRoot -ChildPath "ssc.autoconfig" | Copy-Item -Destination $SSCSecretDir
+    Join-Path $PSScriptRoot -ChildPath "fortify.license" | Copy-Item -Destination $SSCSecretDir
+    Join-Path $CertDir -ChildPath "ssc-service.jks" |  Copy-Item -Destination $SSCSecretDir
+    Join-Path $CertDir -ChildPath "truststore" | Copy-Item -Destination $SSCSecretDir
 
     Set-Location $SSCSecretDir
 
@@ -193,7 +209,7 @@ if ($Components.Count -gt 0 -and ($Components.Contains("All") -or $Components.Co
         Start-Sleep -Seconds 30
 }
 
-if ($Components.Count -gt 0 -and ($Components.Contains("All") -or $Components.Contains("SCSAST")))
+if ($InstallSCSAST)
 {
     Write-Host "Installing ScanCentral SAST ..."
 
@@ -214,9 +230,10 @@ if ($Components.Count -gt 0 -and ($Components.Contains("All") -or $Components.Co
 
         Start-Sleep -Seconds 10
 }
-if ($Components.Count -gt 0 -and ($Components.Contains("All") -or $Components.Contains("SCDAST")))
+
+if ($InstallSCDAST)
 {
-    $PostgresStatus = (kubectl get pods -n default postgresql-0 -o jsonpath="{.status.phase}")
+    $PostgresStatus = (kubectl get pods -n default postgresql-0 -o jsonpath = "{.status.phase}")
     if ($PostgresStatus -eq "Running")
     {
         Write-Host "Postgres is already running ..."
@@ -225,51 +242,53 @@ if ($Components.Count -gt 0 -and ($Components.Contains("All") -or $Components.Co
     {
         Write-Host "Installing Postgres ..."
         & helm install postgresql bitnami/postgresql --version $POSTGRES_HELM_VERSION `
-            --set auth.postgresPassword=password `
-            --set auth.database=scdast_db
+            --set auth.postgresPassword = password `
+            --set auth.database = scdast_db
         Start-Sleep -Seconds 30
     }
 
     Write-Host "Installing ScanCentral DAST ..."
     & helm install scancentral-dast fortify/scancentral-dast --version $SCDAST_HELM_VERSION --timeout 40m `
-        --set imagePullSecrets[0].name=fortifydocker `
-        --set images.upgradeJob.repository="$( $SCDAST_UPGRADE_REPO )" `
-        --set images.upgradeJob.tag="$( $SCDAST_UPGRADE_REPO_VER )" `
-        --set configuration.databaseSettings.databaseProvider=PostgreSQL `
-        --set configuration.databaseSettings.server=postgresql `
-        --set configuration.databaseSettings.database=scdast_db `
-        --set configuration.databaseSettings.dboLevelDatabaseAccount.username=postgres `
-        --set configuration.databaseSettings.dboLevelDatabaseAccount.password=password `
-        --set configuration.databaseSettings.standardDatabaseAccount.username=postgres `
-        --set configuration.databaseSettings.standardDatabaseAccount.password=password `
-        --set configuration.serviceToken=thisisaservicetoken `
-        --set configuration.sSCSettings.sSCRootUrl="https://$( $SSCUrl )" `
-        --set configuration.sSCSettings.serviceAccountUserName="$( $SSC_ADMIN_USER )" `
-        --set configuration.sSCSettings.serviceAccountPassword="$( $SSC_ADMIN_PASSWORD )" `
-        --set configuration.dASTApiSettings.corsOrigins[0]="https://$( $SSCUrl )" `
-        --set configuration.dASTApiSettings.corsOrigins[1]="https://$( $SCDASTAPIUrl )" `
-        --set configuration.lIMSettings.limUrl="$( $LIM_API_URL )" `
-        --set configuration.lIMSettings.serviceAccountUserName="$( $LIM_ADMIN_USER )" `
-        --set configuration.lIMSettings.serviceAccountPassword="$( $LIM_ADMIN_PASSWORD )" `
-        --set configuration.lIMSettings.defaultLimPoolName="$( $LIM_POOL_NAME )" `
-        --set configuration.lIMSettings.defaultLimPoolPassword="$( $LIM_POOL_PASSWORD )" `
-        --set configuration.lIMSettings.useLimRestApi=true `
-        --set ingress.api.enabled=true `
-        --set ingress.api.hosts[0].host="$( $SCDASTAPIUrl )" `
-        --set ingress.api.hosts[0].paths[0].path=/ `
-        --set ingress.api.hosts[0].paths[0].pathType=Prefix `
-        --set ingress.api.tls[0].secretName=wildcard-certificate `
-        --set ingress.api.tls[0].hosts[0]="$( $SCDASTAPIUrl )"
+        --set imagePullSecrets[0].name = fortifydocker `
+        --set images.upgradeJob.repository = "$( $SCDAST_UPGRADE_REPO )" `
+        --set images.upgradeJob.tag = "$( $SCDAST_UPGRADE_REPO_VER )" `
+        --set configuration.databaseSettings.databaseProvider = PostgreSQL `
+        --set configuration.databaseSettings.server = postgresql `
+        --set configuration.databaseSettings.database = scdast_db `
+        --set configuration.databaseSettings.dboLevelDatabaseAccount.username = postgres `
+        --set configuration.databaseSettings.dboLevelDatabaseAccount.password = password `
+        --set configuration.databaseSettings.standardDatabaseAccount.username = postgres `
+        --set configuration.databaseSettings.standardDatabaseAccount.password = password `
+        --set configuration.serviceToken = thisisaservicetoken `
+        --set configuration.sSCSettings.sSCRootUrl = "https://$( $SSCUrl )" `
+        --set configuration.sSCSettings.serviceAccountUserName = "$( $SSC_ADMIN_USER )" `
+        --set configuration.sSCSettings.serviceAccountPassword = "$( $SSC_ADMIN_PASSWORD )" `
+        --set configuration.dASTApiSettings.corsOrigins[0] ="https://$( $SSCUrl )" `
+        --set configuration.dASTApiSettings.corsOrigins[1] ="https://$( $SCDASTAPIUrl )" `
+        --set configuration.lIMSettings.limUrl = "$( $LIM_API_URL )" `
+        --set configuration.lIMSettings.serviceAccountUserName = "$( $LIM_ADMIN_USER )" `
+        --set configuration.lIMSettings.serviceAccountPassword = "$( $LIM_ADMIN_PASSWORD )" `
+        --set configuration.lIMSettings.defaultLimPoolName = "$( $LIM_POOL_NAME )" `
+        --set configuration.lIMSettings.defaultLimPoolPassword = "$( $LIM_POOL_PASSWORD )" `
+        --set configuration.lIMSettings.useLimRestApi = true `
+        --set ingress.api.enabled = true `
+        --set ingress.api.hosts[0].host ="$( $SCDASTAPIUrl )" `
+        --set ingress.api.hosts[0].paths[0].path = / `
+        --set ingress.api.hosts[0].paths[0].pathType = Prefix `
+        --set ingress.api.tls[0].secretName = wildcard-certificate `
+        --set ingress.api.tls[0].hosts[0] ="$( $SCDASTAPIUrl )"
 
     Start-Sleep -Seconds 10
+}
+# get running environment
 
-    # get running environment
-
-    $ClientAuthTokenBase64 = (kubectl get secret scancentral-sast -o jsonpath="{.data.scancentral-client-auth-token}")
+if ($InstallSCSAST)
+{
+    $ClientAuthTokenBase64 = (kubectl get secret scancentral-sast -o jsonpath = "{.data.scancentral-client-auth-token}")
     $ClientAuthToken = [System.Text.Encoding]::ASCII.GetString([System.Convert]::FromBase64String($ClientAuthTokenBase64))
-    $WorkerAuthTokenBase64 = (kubectl get secret scancentral-sast -o jsonpath="{.data.scancentral-worker-auth-token}")
+    $WorkerAuthTokenBase64 = (kubectl get secret scancentral-sast -o jsonpath = "{.data.scancentral-worker-auth-token}")
     $WorkerAuthToken = [System.Text.Encoding]::ASCII.GetString([System.Convert]::FromBase64String($WorkerAuthTokenBase64))
-    $ScanCentralCtrlSecretBase64 = (kubectl get secret scancentral-sast -o jsonpath="{.data.scancentral-ssc-scancentral-ctrl-secret}")
+    $ScanCentralCtrlSecretBase64 = (kubectl get secret scancentral-sast -o jsonpath = "{.data.scancentral-ssc-scancentral-ctrl-secret}")
     $ScanCentralCtrlSecret = [System.Text.Encoding]::ASCII.GetString([System.Convert]::FromBase64String($ScanCentralCtrlSecretBase64))
 
     Write-Host "Installing Scancentral Client ..."
