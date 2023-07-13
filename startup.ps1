@@ -157,6 +157,7 @@ else
     Write-Host "Installing MySql ..."
     & helm install mysql bitnami/mysql -f mysql-values.yaml --version $MYSQL_HELM_VERSION
     Start-Sleep -Seconds 30
+    $MySqlStatus = Wait-UntilPodStatus -PodName mysql-0
 }
 
 # check if SSC is already running
@@ -206,7 +207,6 @@ else
         --set secretRef.keys.jmvTruststorePasswordEntry=truststore.password `
         --set resources=null
 
-    Write-Host -n "SSC Status ... "
     $SSCStatus = Wait-UntilPodStatus -PodName ssc-webapp-0
 
     kubectl create ingress ssc-ingress `
@@ -229,19 +229,19 @@ if ($InstallSCSAST)
         Write-Host "Installing ScanCentral SAST ..."
 
         helm install scancentral-sast fortify/scancentral-sast --version $SCSAST_HELM_VERSION `
-            --set imagePullSecrets[0].name = fortifydocker `
-            --set-file fortifyLicense = fortify.license `
-            --set controller.thisUrl = "https://$( $SCSASTUrl )/scancentral-ctrl" `
-            --set controller.sscUrl = "https://$( $SSCUrl )" `
-            --set-file trustedCertificates[0] = certificates/certificate.pem `
-            --set controller.persistence.enabled = false `
-            --set controller.ingress.enabled = true `
-            --set controller.ingress.hosts[0].host ="$( $SCSASTUrl )" `
-            --set controller.ingress.hosts[0].paths[0].path = / `
-            --set controller.ingress.hosts[0].paths[0].pathType = Prefix `
-            --set controller.ingress.tls[0].secretName = wildcard-certificate `
-            --set controller.ingress.tls[0].hosts[0] =$( $SCSASTUrl ) `
-            --set controller.ingress.annotations."nginx\.ingress\.kubernetes\.io/proxy-body-size" = "512m"
+            --set imagePullSecrets[0].name=fortifydocker `
+            --set-file fortifyLicense=fortify.license `
+            --set controller.thisUrl="https://$( $SCSASTUrl )/scancentral-ctrl" `
+            --set controller.sscUrl="https://$( $SSCUrl )" `
+            --set-file trustedCertificates[0]=certificates/certificate.pem `
+            --set controller.persistence.enabled=false `
+            --set controller.ingress.enabled=true `
+            --set controller.ingress.hosts[0].host="$( $SCSASTUrl )" `
+            --set controller.ingress.hosts[0].paths[0].path=/ `
+            --set controller.ingress.hosts[0].paths[0].pathType=Prefix `
+            --set controller.ingress.tls[0].secretName=wildcard-certificate `
+            --set controller.ingress.tls[0].hosts[0]=$( $SCSASTUrl ) `
+            --set controller.ingress.annotations."nginx\.ingress\.kubernetes\.io/proxy-body-size"="512m"
 
         $SCSastControllerStatus = Wait-UntilPodStatus -PodName scancentral-sast-controller-0
         $SCSastWorkerStatus = Wait-UntilPodStatus -PodName scancentral-sast-worker-linux-0
@@ -250,7 +250,7 @@ if ($InstallSCSAST)
 
 if ($InstallSCDAST)
 {
-    $PostgresStatus = (kubectl get pods -n default postgresql-0 -o jsonpath = "{.status.phase}") 2> null
+    $PostgresStatus = Get-PodStatus -PodName postgresql-0
     if ($PostgresStatus -eq "Running")
     {
         Write-Host "Postgres is already running ..."
@@ -259,41 +259,42 @@ if ($InstallSCDAST)
     {
         Write-Host "Installing Postgres ..."
         & helm install postgresql bitnami/postgresql --version $POSTGRES_HELM_VERSION `
-            --set auth.postgresPassword = password `
-            --set auth.database = scdast_db
+            --set auth.postgresPassword=password `
+            --set auth.database=scdast_db
         Start-Sleep -Seconds 30
+        $MySqlStatus = Wait-UntilPodStatus -PodName postgresql-0
     }
 
     Write-Host "Installing ScanCentral DAST ..."
     & helm install scancentral-dast fortify/scancentral-dast --version $SCDAST_HELM_VERSION --timeout 40m `
-        --set imagePullSecrets[0].name = fortifydocker `
-        --set images.upgradeJob.repository = "$( $SCDAST_UPGRADE_REPO )" `
-        --set images.upgradeJob.tag = "$( $SCDAST_UPGRADE_REPO_VER )" `
-        --set configuration.databaseSettings.databaseProvider = PostgreSQL `
-        --set configuration.databaseSettings.server = postgresql `
-        --set configuration.databaseSettings.database = scdast_db `
-        --set configuration.databaseSettings.dboLevelDatabaseAccount.username = postgres `
-        --set configuration.databaseSettings.dboLevelDatabaseAccount.password = password `
-        --set configuration.databaseSettings.standardDatabaseAccount.username = postgres `
-        --set configuration.databaseSettings.standardDatabaseAccount.password = password `
-        --set configuration.serviceToken = thisisaservicetoken `
-        --set configuration.sSCSettings.sSCRootUrl = "https://$( $SSCUrl )" `
-        --set configuration.sSCSettings.serviceAccountUserName = "$( $SSC_ADMIN_USER )" `
-        --set configuration.sSCSettings.serviceAccountPassword = "$( $SSC_ADMIN_PASSWORD )" `
-        --set configuration.dASTApiSettings.corsOrigins[0] ="https://$( $SSCUrl )" `
-        --set configuration.dASTApiSettings.corsOrigins[1] ="https://$( $SCDASTAPIUrl )" `
-        --set configuration.lIMSettings.limUrl = "$( $LIM_API_URL )" `
-        --set configuration.lIMSettings.serviceAccountUserName = "$( $LIM_ADMIN_USER )" `
-        --set configuration.lIMSettings.serviceAccountPassword = "$( $LIM_ADMIN_PASSWORD )" `
-        --set configuration.lIMSettings.defaultLimPoolName = "$( $LIM_POOL_NAME )" `
-        --set configuration.lIMSettings.defaultLimPoolPassword = "$( $LIM_POOL_PASSWORD )" `
-        --set configuration.lIMSettings.useLimRestApi = true `
-        --set ingress.api.enabled = true `
-        --set ingress.api.hosts[0].host ="$( $SCDASTAPIUrl )" `
-        --set ingress.api.hosts[0].paths[0].path = / `
-        --set ingress.api.hosts[0].paths[0].pathType = Prefix `
-        --set ingress.api.tls[0].secretName = wildcard-certificate `
-        --set ingress.api.tls[0].hosts[0] ="$( $SCDASTAPIUrl )"
+        --set imagePullSecrets[0].name=fortifydocker `
+        --set images.upgradeJob.repository="$( $SCDAST_UPGRADE_REPO )" `
+        --set images.upgradeJob.tag="$( $SCDAST_UPGRADE_REPO_VER )" `
+        --set configuration.databaseSettings.databaseProvider=PostgreSQL `
+        --set configuration.databaseSettings.server=postgresql `
+        --set configuration.databaseSettings.database=scdast_db `
+        --set configuration.databaseSettings.dboLevelDatabaseAccount.username=postgres `
+        --set configuration.databaseSettings.dboLevelDatabaseAccount.password=password `
+        --set configuration.databaseSettings.standardDatabaseAccount.username=postgres `
+        --set configuration.databaseSettings.standardDatabaseAccount.password=password `
+        --set configuration.serviceToken=thisisaservicetoken `
+        --set configuration.sSCSettings.sSCRootUrl="https://$( $SSCUrl )" `
+        --set configuration.sSCSettings.serviceAccountUserName="$( $SSC_ADMIN_USER )" `
+        --set configuration.sSCSettings.serviceAccountPassword="$( $SSC_ADMIN_PASSWORD )" `
+        --set configuration.dASTApiSettings.corsOrigins[0]="https://$( $SSCUrl )" `
+        --set configuration.dASTApiSettings.corsOrigins[1]="https://$( $SCDASTAPIUrl )" `
+        --set configuration.lIMSettings.limUrl="$( $LIM_API_URL )" `
+        --set configuration.lIMSettings.serviceAccountUserName="$( $LIM_ADMIN_USER )" `
+        --set configuration.lIMSettings.serviceAccountPassword="$( $LIM_ADMIN_PASSWORD )" `
+        --set configuration.lIMSettings.defaultLimPoolName="$( $LIM_POOL_NAME )" `
+        --set configuration.lIMSettings.defaultLimPoolPassword="$( $LIM_POOL_PASSWORD )" `
+        --set configuration.lIMSettings.useLimRestApi=true `
+        --set ingress.api.enabled=true `
+        --set ingress.api.hosts[0].host="$( $SCDASTAPIUrl )" `
+        --set ingress.api.hosts[0].paths[0].path=/ `
+        --set ingress.api.hosts[0].paths[0].pathType=Prefix `
+        --set ingress.api.tls[0].secretName=wildcard-certificate `
+        --set ingress.api.tls[0].hosts[0]="$( $SCDASTAPIUrl )"
 
     Start-Sleep -Seconds 10
 }

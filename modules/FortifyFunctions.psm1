@@ -62,7 +62,7 @@ function Wait-UntilPodStatus
         [String]$UntilStatus = "Running"
     )
     $Status = $Null
-    Write-Host -n "Waiting for ${PodName} status: ${UntilStatus} "
+    Write-Host -n "Waiting unitl ${PodName} is ${UntilStatus} "
     While ($Status -ne $UntilStatus)
     {
         $Status = (kubectl get pods -n default $PodName -o jsonpath="{.status.phase}") 2>$null
