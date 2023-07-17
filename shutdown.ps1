@@ -1,3 +1,12 @@
+Write-Host "Fortify minikube shutdown script"
+
+# Import some supporting functions
+Import-Module $PSScriptRoot\modules\FortifyFunctions.psm1 -Scope Global -Force
+Set-PSPlatform
+
+# Setup Java Environment and Tools
+Set-JavaTools
+
 & minikube stop
 
 & minikube delete
@@ -20,8 +29,6 @@ If ((Test-Path -PathType container $FcliDir))
     Get-ChildItem -Path $FcliDir -Exclude 'fcli.*' | Remove-Item -Recurse -Force
 }
 
-$Env:PATH = "$($PSScriptRoot)\fcli;$Env:PATH"
+Remove-Item -Path fcli.env -Force
 
-function jfcli { java -jar .\fcli\fcli.jar $args }
-
-jfcli tool scancentral-client uninstall latest -y
+#Invoke-Fcli tool scancentral-client uninstall latest -y

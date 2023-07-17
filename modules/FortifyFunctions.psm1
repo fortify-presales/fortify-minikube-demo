@@ -21,7 +21,7 @@ function Set-JavaTools
     if ($IsLinux)
     {
         Write-Host "Running on Linux ..."
-        $JavaHome = Join-Path $RootPath -ChildPath "/openjdk-jre-11.0.18-linux-x64"
+        $JavaHome = Join-Path $RootPath -ChildPath "openjdk-jre-11.0.18-linux-x64"
         $JavaBin = Join-Path $JavaHome -ChildPath "bin"
         $JavaExe = Join-Path $JavaBin -ChildPath "java"
     }
@@ -36,11 +36,31 @@ function Set-JavaTools
     {
         throw "Unsupported platform"
     }
+    $FcliDir = Join-Path $RootPath -ChildPath "fcli"
+    $FcliJar = Join-Path $FcliDir -ChildPath "fcli.jar"
     New-Variable -Option Constant -Name JavaHome -Scope global -Value $JavaHome -ErrorAction SilentlyContinue
     New-Variable -Option Constant -Name JavaBin  -Scope global -Value $JavaBin -ErrorAction SilentlyContinue
     New-Variable -Option Constant -Name JavaExe  -Scope global -Value $JavaExe -ErrorAction SilentlyContinue
+    New-Variable -Option Constant -Name FcliDir  -Scope global -Value $FcliDir -ErrorAction SilentlyContinue
+    New-Variable -Option Constant -Name FcliJar  -Scope global -Value $FcliJar -ErrorAction SilentlyContinue
 }
 Export-ModuleMember -Function Set-JavaTools
+
+function Invoke-Fcli
+{
+    $ArgumentList = @("-jar", $FcliJar)
+    ForEach ($a in $args) { $ArgumentList += $a}
+    Write-Host "Executing fcli: java $ArgumentList"
+    $params = @{
+        FilePath = $JavaExe
+        WorkingDirectory = $PSScriptRoot
+        ArgumentList = $ArgumentList
+        PassThru = $true
+        Wait = $true
+    }
+    $p = Start-Process @params
+}
+Export-ModuleMember -Function Invoke-Fcli
 
 function Get-PodStatus
 {

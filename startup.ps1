@@ -74,7 +74,16 @@ if ($Components.Count -gt 0 -and ($Components.Contains("SCSAST")))
     if ([string]::IsNullOrEmpty($SCDAST_UPGRADE_REPO)) { throw "SCDAST_UPGRADE_REPO needs to be set in .env file" }
     if ([string]::IsNullOrEmpty($SCDAST_UPGRADE_REPO_VER)) { throw "SCDAST_UPGRADE_REPO_VER needs to be set in .env file" }
 }
-
+if ($IsLinux)
+{
+    $MinikubeDriver="docker"
+    $UseStaticIP="--static-ip=192.168.200.200"
+}
+else
+{
+    $MinikubeDriver = "hyperv"
+    $UseStaticIP = ""
+}
 $FcliJar = Join-Path $PSScriptRoot -ChildPath "fcli" | Join-Path -ChildPath "fcli.jar"
 
 # Setup Java Environment and Tools
@@ -90,7 +99,7 @@ if ($MinikubeStatus -eq "Running")
 else
 {
     Write-Host "minikube not running ... starting ..."
-    & minikube start --memory $MINIKUBE_MEM --cpus $MINIKUBE_CPUS #--driver docker --static-ip 192.168.200.200
+    & minikube start --memory $MINIKUBE_MEM --cpus $MINIKUBE_CPUS --driver=$MinikubeDriver $UseStaticIP
     Start-Sleep -Seconds 5
     & minikube addons enable ingress
     Write-Host "minikube is running ..."
