@@ -23,10 +23,8 @@ gradle-app.setting
 .env
 /fortify.license
 /scancentral_client/
-/openjdk-jre-*/
 /.idea/
 
 certificates
 ssc-secret
-openlogic-openjdk-jre-11.0.18+10-linux-x64
 fcli.env

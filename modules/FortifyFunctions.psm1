@@ -24,6 +24,7 @@ function Set-JavaTools
         $JavaHome = Join-Path $RootPath -ChildPath "jdk-17-jre-linux-x64"
         $JavaBin = Join-Path $JavaHome -ChildPath "bin"
         $JavaExe = Join-Path $JavaBin -ChildPath "java"
+        $KeytoolExe = Join-Path $JavaBin -ChildPath "keytool"
     }
     elseif ($IsWindows)
     {
@@ -31,6 +32,7 @@ function Set-JavaTools
         $JavaHome = Join-Path $RootPath -ChildPath "jdk-17-jre-windows-x64"
         $JavaBin = Join-Path $JavaHome -ChildPath "bin"
         $JavaExe = Join-Path $JavaBin -ChildPath "java.exe"
+        $KeytoolExe = Join-Path $JavaBin -ChildPath "keytool.exe"
     }
     else
     {
@@ -41,6 +43,7 @@ function Set-JavaTools
     New-Variable -Option Constant -Name JavaHome -Scope global -Value $JavaHome -ErrorAction SilentlyContinue
     New-Variable -Option Constant -Name JavaBin  -Scope global -Value $JavaBin -ErrorAction SilentlyContinue
     New-Variable -Option Constant -Name JavaExe  -Scope global -Value $JavaExe -ErrorAction SilentlyContinue
+    New-Variable -Option Constant -Name KeytoolExe  -Scope global -Value $KeytoolExe -ErrorAction SilentlyContinue
     New-Variable -Option Constant -Name FcliDir  -Scope global -Value $FcliDir -ErrorAction SilentlyContinue
     New-Variable -Option Constant -Name FcliJar  -Scope global -Value $FcliJar -ErrorAction SilentlyContinue
 }

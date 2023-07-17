@@ -116,17 +116,24 @@ Note: Do not place this file in source control.
 
 ## Install environment
 
-Run the following command to start minikube and create a Fortify Environment:
+Run the following command to start minikube and create a Fortify ScanCentral SAST Environment:
 
 ```aidl
-.\startup.ps1 -Components All
+.\startup.ps1 -Components SCSAST
 ```
 
 It will take a while for everything to complete. You can specify the Fortify "components"
-to install with the `-Components` option, e.g. `All`, `SSC`, `SCSAST` or `SCDAST`.
+to install with the `-Components` option, e.g. `SCSAST` or `SCDAST`.
 
 Once the details of the environment are complete at the end you will need to login to Fortify
 SSC and enter the details of ScanCentral SAST/DAST as per the instructions.
+
+Note: if you are using Windows Subsystem for Linux (WSL) you will need to additionally
+expose the ssc-service using the following:
+
+```
+minikube service ssc-service
+```
 
 If you want to populate the Fortify environment with sample data, you can the following command:
 

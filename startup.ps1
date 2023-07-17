@@ -76,7 +76,7 @@ if ($Components.Count -gt 0 -and ($Components.Contains("SCSAST")))
 }
 if ($IsLinux)
 {
-    $MinikubeDriver="docker"
+    $MinikubeDriver = "docker"
     $UseStaticIP="--static-ip=192.168.200.200"
 }
 else
@@ -84,11 +84,9 @@ else
     $MinikubeDriver = "hyperv"
     $UseStaticIP = ""
 }
-$FcliJar = Join-Path $PSScriptRoot -ChildPath "fcli" | Join-Path -ChildPath "fcli.jar"
 
 # Setup Java Environment and Tools
 Set-JavaTools
-$KeyToolExe = Join-Path $JavaBin -ChildPath "keytool"
 
 # check if minikube is running
 $MinikubeStatus = (minikube status --format='{{.Host}}')
@@ -144,13 +142,12 @@ else
 
     & "$OPENSSL" pkcs12 -export -name ssc -in certificate.pem -inkey key.pem -out keystore.p12 -password pass:changeme
 
-    & "$KeyToolExe" -importkeystore -destkeystore ssc-service.jks -srckeystore keystore.p12 -srcstoretype pkcs12 -alias ssc -srcstorepass changeme -deststorepass changeme
-
-    & "$KeyToolExe"  -import -trustcacerts -file certificate.pem -alias "wildcard-cert" -keystore truststore -storepass changeme -noprompt
+    & "$KeytoolExe" -importkeystore -destkeystore ssc-service.jks -srckeystore keystore.p12 -srcstoretype pkcs12 -alias ssc -srcstorepass changeme -deststorepass changeme
+    & "$KeytoolExe"  -import -trustcacerts -file certificate.pem -alias "wildcard-cert" -keystore truststore -storepass changeme -noprompt
 
     $SRCKEYSTORE = Join-Path $PSScriptRoot -ChildPath "certificates" | Join-Path -ChildPath "keystore.p12"
     $DESTKEYSTORE = Join-Path $JavaHome -ChildPath "lib" | Join-Path -ChildPath "security" | Join-Path -ChildPath "cacerts"
-    & "$KeyToolExe"  -importkeystore -srckeystore $SRCKEYSTORE -srcstoretype pkcs12 -destkeystore $DESTKEYSTORE -srcstorepass changeme -deststorepass changeit -noprompt
+    & "$KeytoolExe"  -importkeystore -srckeystore $SRCKEYSTORE -srcstoretype pkcs12 -destkeystore $DESTKEYSTORE -srcstorepass changeme -deststorepass changeit -noprompt
 
     Set-Location $PSScriptRoot
 }

@@ -29,6 +29,9 @@ If ((Test-Path -PathType container $FcliDir))
     Get-ChildItem -Path $FcliDir -Exclude 'fcli.*' | Remove-Item -Recurse -Force
 }
 
-Remove-Item -Path fcli.env -Force
+if ((Test-Path -PathType Leaf "fcli.env"))
+{
+    Remove-Item -Path fcli.env -Force
+}    
 
 #Invoke-Fcli tool scancentral-client uninstall latest -y
