@@ -21,14 +21,14 @@ function Set-JavaTools
     if ($IsLinux)
     {
         Write-Host "Running on Linux ..."
-        $JavaHome = Join-Path $RootPath -ChildPath "openjdk-jre-11.0.18-linux-x64"
+        $JavaHome = Join-Path $RootPath -ChildPath "jdk-17-jre-linux-x64"
         $JavaBin = Join-Path $JavaHome -ChildPath "bin"
         $JavaExe = Join-Path $JavaBin -ChildPath "java"
     }
     elseif ($IsWindows)
     {
         Write-Host "Running on Windows ..."
-        $JavaHome = Join-Path $RootPath -ChildPath "openjdk-jre-11.0.18-windows-x64"
+        $JavaHome = Join-Path $RootPath -ChildPath "jdk-17-jre-windows-x64"
         $JavaBin = Join-Path $JavaHome -ChildPath "bin"
         $JavaExe = Join-Path $JavaBin -ChildPath "java.exe"
     }
