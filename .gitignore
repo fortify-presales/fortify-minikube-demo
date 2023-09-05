@@ -22,7 +22,7 @@ gradle-app.setting
 
 .env
 /fortify.license
-/scancentral_client/
+/scancentral_client.old/
 /.idea/
 
 certificates

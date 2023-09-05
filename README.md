@@ -91,6 +91,8 @@ DOCKERHUB_USERNAME=_YOUR_DOCKERHUB_LOGIN_
 DOCKERHUB_PASSWORD=_YOUR_DOCKERHUB_PASSWORD_
 # Path to openssl - use OpenSSL from Git on Windows
 OPENSSL_PATH=C:\\Program Files\\Git\\mingw64\\bin\\openssl.exe
+# Path to openssl on Linux
+#OPENSSL_PATH=/usr/bin/openssl
 # Version on ScanCentral to use
 SCANCENTRAL_VERSION=23.1
 # Fortify Demo App to create
@@ -111,6 +113,14 @@ SCSAST_HELM_VERSION=23.1.0
 SCDAST_HELM_VERSION=23.1.0
 MYSQL_HELM_VERSION=9.3.1
 POSTGRES_HELM_VERSION=11.9.0
+# The following values will be replaced by scripts
+SSC_URL=
+SCSAST_URL=
+SCDAST_URL=
+CLIENT_AUTH_TOKEN=
+WORKER_AUTH_TOKEN=
+SHARED_SECRET=
+SSC_CI_TOKEN=
 ```
 Note: Do not place this file in source control.
 
@@ -119,7 +129,7 @@ Note: Do not place this file in source control.
 Run the following command to start minikube and create a Fortify ScanCentral SAST Environment:
 
 ```aidl
-.\startup.ps1 -Components SCSAST
+.\scripts\startup.ps1 -Components SCSAST
 ```
 
 It will take a while for everything to complete. You can specify the Fortify "components"
@@ -128,23 +138,16 @@ to install with the `-Components` option, e.g. `SCSAST` or `SCDAST`.
 Once the details of the environment are complete at the end you will need to login to Fortify
 SSC and enter the details of ScanCentral SAST/DAST as per the instructions.
 
-Note: if you are using Windows Subsystem for Linux (WSL) you will need to additionally
-expose the ssc-service using the following:
-
-```
-minikube service ssc-service
-```
-
 If you want to populate the Fortify environment with sample data, you can the following command:
 
 ```aidl
-.\populate.ps1
+.\scripts\populate.ps1
 ```
 
-Note: if you need to reset the Fortify SSC "admin" user's password you can use the following script:
+Note: if you need to set/reset the Fortify SSC "admin" user's password you can use the following script:
 
 ```aidl
-.\reset_ssc_admin_user.ps1
+.\scripts\reset_ssc_admin_user.ps1
 ```
 
 ## Remove environment
@@ -152,5 +155,5 @@ Note: if you need to reset the Fortify SSC "admin" user's password you can use t
 If you wish to remove the minikube environment completely, you can use the following command:
 
 ```aidl
-.\shutdown.ps1
+.\scripts\shutdown.ps1
 ```
