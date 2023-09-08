@@ -3,25 +3,21 @@
 # Parameters
 param (
     [Parameter(Mandatory=$false)]
-    [ValidateSet("SCSAST","SCDAST")]
-    [String[]]$Components,
+    [switch]$RecreateCertificates,
     [Parameter(Mandatory=$false)]
-    [switch]$RecreateCertificates
+    [switch]$SkipSCSAST,
+    [Parameter(Mandatory=$false)]
+    [switch]$SkipSCDAST
 )
 
-if ($Components.Count -gt 0)
-{
-    $InstallSCSAST = $Components.Contains("SCSAST")
-    $InstallSCDAST = $Components.Contains("SCDAST")
-}
+$InstallSCSAST = (-not $SkipSCSAST)
+$InstallSCDAST = (-not $SkipSCDAST)
 
 Write-Host "Fortify minikube startup script"
 
 # Import some supporting functions
 Import-Module $PSScriptRoot\modules\FortifyFunctions.psm1 -Scope Global -Force
 Set-PSPlatform
-
-$RootDir = Split-Path -Path $PSScriptRoot -Parent
 
 # Import local environment specific settings
 $EnvSettings = $(ConvertFrom-StringData -StringData (Get-Content (Join-Path "." -ChildPath ".env") | Where-Object {-not ($_.StartsWith('#'))} | Out-String))
@@ -60,11 +56,11 @@ if ([string]::IsNullOrEmpty($SCDAST_HELM_VERSION)) { $SCDAST_HELM_VERSION = "22.
 if ([string]::IsNullOrEmpty($MYSQL_HELM_VERSION)) { $MYSQL_HELM_VERSION = "9.3.1" }
 if ([string]::IsNullOrEmpty($POSTGRES_HELM_VERSION)) { $POSTGRES_HELM_VERSION = "11.9.0" }
 if ([string]::IsNullOrEmpty($OPENSSL)) { $OPENSSL = "openssl" }
-if ($Components.Count -gt 0 -and ($Components.Contains("SCSAST")))
+if ($InstallSCSAST)
 {
     # any other required SCSAST settings
 }
-if ($Components.Count -gt 0 -and ($Components.Contains("SCSAST")))
+if ($InstallSCDAST)
 {
     if ([string]::IsNullOrEmpty($LIM_API_URL)) { throw "LIM_API_URL needs to be set in .env file" }
     if ([string]::IsNullOrEmpty($LIM_ADMIN_USER)) { throw "LIM_ADMIN_USER needs to be set in .env file" }
@@ -114,7 +110,7 @@ $CertUrl = "/CN=*.$($MinikubeIP.Replace('.','-')).nip.io"
 kubectl delete secret docker-registry fortifydocker --ignore-not-found
 kubectl create secret docker-registry fortifydocker --docker-username $DOCKERHUB_USERNAME --docker-password $DOCKERHUB_PASSWORD
 
-$CertDir = Join-Path $Parent -ChildPath "certificates"
+$CertDir = Join-Path $PSScriptRoot -ChildPath "certificates"
 if ($RecreateCertificates)
 {
     Write-Host "Deleting existing certificates ..."
@@ -144,15 +140,15 @@ else
     & "$OPENSSL" pkcs12 -export -name ssc -in certificate.pem -inkey key.pem -out keystore.p12 -password pass:changeit
 
     & "$KeytoolExe" -importkeystore -destkeystore ssc-service.jks -srckeystore keystore.p12 -srcstoretype pkcs12 -alias ssc -srcstorepass changeit -deststorepass changeit
-    & "$KeytoolExe"  -import -trustcacerts -file certificate.pem -alias "wildcard-cert" -keystore truststore -storepass changeit -noprompt
+    & "$KeytoolExe" -import -trustcacerts -file certificate.pem -alias "wildcard-cert" -keystore truststore -storepass changeit -noprompt
 
-    $SRCKEYSTORE = Join-Path $Parent -ChildPath "certificates" | Join-Path -ChildPath "keystore.p12"
+    $SRCKEYSTORE = Join-Path $PSScriptRoot -ChildPath "certificates" | Join-Path -ChildPath "keystore.p12"
     $DESTKEYSTORE = Join-Path $JavaHome -ChildPath "lib" | Join-Path -ChildPath "security" | Join-Path -ChildPath "cacerts"
-    & "$KeytoolExe" -importkeystore -srckeystore $SRCKEYSTORE -srcstoretype pkcs12 -destkeystore $DESTKEYSTORE -srcstorepass changeit -deststorepass changeit -noprompt
+    & "$KeytoolExe" -importkeystore -alias ssc -srckeystore $SRCKEYSTORE -srcstoretype pkcs12 -destkeystore $DESTKEYSTORE -srcstorepass changeit -deststorepass changeit -noprompt
 
-    $CERFILE = Join-Path $Parent -ChildPath "certificates" | Join-Path -ChildPath "certificate.cer"
-    & "$KeytoolExe" -importcert -alias scancentral -keystore $DESTKEYSTORE -file $CERFILE -trustcacerts -keypass changeit -deststorepass changeit
-    Set-Location $Parent
+    $CERFILE = Join-Path $PSScriptRoot -ChildPath "certificates" | Join-Path -ChildPath "certificate.cer"
+    & "$KeytoolExe" -import -alias scancentral -keystore $DESTKEYSTORE -file $CERFILE -trustcacerts -keypass changeit -deststorepass changeit
+    Set-Location $PSScriptRoot
 }
 
 # run update to prevent spurious errors
@@ -182,15 +178,15 @@ else
 {
     Write-Host "Installing SSC ..."
 
-    $SSCSecretDir = Join-Path $Parent -ChildPath "ssc-secret"
+    $SSCSecretDir = Join-Path $PSScriptRoot -ChildPath "ssc-secret"
     If ((Test-Path -PathType container $SSCSecretDir))
     {
         Remove-Item -LiteralPath $SSCSecretDir -Force -Recurse
     }
     New-Item -ItemType Directory -Path $SSCSecretDir
 
-    Join-Path $Parent -ChildPath "ssc.autoconfig" | Copy-Item -Destination $SSCSecretDir
-    Join-Path $Parent -ChildPath "fortify.license" | Copy-Item -Destination $SSCSecretDir
+    Join-Path $PSScriptRoot -ChildPath "ssc.autoconfig" | Copy-Item -Destination $SSCSecretDir
+    Join-Path $PSScriptRoot -ChildPath "fortify.license" | Copy-Item -Destination $SSCSecretDir
     Join-Path $CertDir -ChildPath "ssc-service.jks" |  Copy-Item -Destination $SSCSecretDir
     Join-Path $CertDir -ChildPath "truststore" | Copy-Item -Destination $SSCSecretDir
 
@@ -202,7 +198,7 @@ else
         --from-literal=ssc-service.jks.key.password=changeit `
         --from-literal=truststore.password=changeit
 
-    Set-Location $Parent
+    Set-Location $PSScriptRoot
 
     & helm repo add fortify https://fortify.github.io/helm3-charts
 
@@ -323,10 +319,9 @@ if ($SCSastControllerStatus -eq "Running")
 }
 
 Write-Host "Updating environment variables in .env ..."
-$EnvFile = Join-Path $Parent -ChildPath ".env"
+$EnvFile = Join-Path $PSScriptRoot -ChildPath ".env"
 if ($SSCStatus -eq "Running")
 {
-    Write-Host "in here"
     Update-EnvFile -File $EnvFile -Find "^SSC_URL=.*$" -Replace "SSC_URL=https://$($SSCUrl)"
 }
 if ($InstallSCSAST)

@@ -21,10 +21,9 @@ gradle-app.setting
 .classpath
 
 .env
-/fortify.license
-/scancentral_client.old/
-/.idea/
-
+fortify.license
+.idea/
 certificates
 ssc-secret
 fcli.env
+*.fpr

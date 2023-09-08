@@ -129,11 +129,11 @@ Note: Do not place this file in source control.
 Run the following command to start minikube and create a Fortify ScanCentral SAST Environment:
 
 ```aidl
-.\scripts\startup.ps1 -Components SCSAST
+.\startup.ps1
 ```
 
 It will take a while for everything to complete. You can specify the Fortify "components"
-to install with the `-Components` option, e.g. `SCSAST` or `SCDAST`.
+to skip with the `-SkipSAST` or `-SkipDAST`.
 
 Once the details of the environment are complete at the end you will need to login to Fortify
 SSC and enter the details of ScanCentral SAST/DAST as per the instructions.
@@ -150,10 +150,18 @@ Note: if you need to set/reset the Fortify SSC "admin" user's password you can u
 .\scripts\reset_ssc_admin_user.ps1
 ```
 
+## Running sample scans
+
+You can run a ScanCentral SAST Scan using the included scripts and source code as follows:
+
+```aidl
+.\scancentral_sast_scan.ps1
+```
+
 ## Remove environment
 
 If you wish to remove the minikube environment completely, you can use the following command:
 
 ```aidl
-.\scripts\shutdown.ps1
+.\shutdown.ps1
 ```

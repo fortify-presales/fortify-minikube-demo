@@ -107,7 +107,59 @@ function Update-EnvFile
         [Parameter(Mandatory=$true)]
         [String]$Replace
     )
-    Write-Host $File
     (Get-Content -Path $File) | ForEach-Object{$_ -replace $Find,$Replace} | Set-Content -Path $File
 }
 Export-ModuleMember Update-EnvFile
+
+function Install-ScanCentralClient
+{
+    param (
+        [Parameter(Mandatory=$false)]
+        [String]$Version = "23.1.0",
+        [Parameter(Mandatory=$false)]
+        [String]$InstallDir = "scancentral-client",
+        [Parameter(Mandatory=$true)]
+        [String]$ClientAuthToken
+    )
+    $DownloadUri = "https://tools.fortify.com/scancentral/Fortify_ScanCentral_Client_$($Version)_x64.zip"
+    Invoke-WebRequest -Uri $DownloadUri -OutFile Fortify_ScanCentral_Client_Latest_x64.zip
+    Expand-Archive -Path Fortify_ScanCentral_Client_Latest_x64.zip -DestinationPath $InstallDir
+    $ClientProperties = Join-Path -Path $InstallDir -ChildPath "Core" | Join-Path -ChildPath "config" | Join-Path -ChildPath "client.properties"
+    $Find = "^client_auth_token=.*$"
+    $Replace = "client_auth_token=$($ClientAuthToken)"
+    (Get-Content -Path $ClientProperties) | ForEach-Object{$_ -replace $Find,$Replace} | Set-Content -Path $ClientProperties
+}
+Export-ModuleMember Install-ScanCentralClient
+
+function New-FortifyToken
+{
+    param (
+        [Parameter(Mandatory=$true)]
+        [String]$SSCUri,
+        [Parameter(Mandatory=$true)]
+        [String]$Username,
+        [Parameter(Mandatory=$true)]
+        [String]$Password,
+        [Parameter(Mandatory=$false)]
+        [String]$TokenType = "CIToken"
+    )
+    $Base64AuthInfo = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(("{0}:{1}" -f $Username,$Password)))
+    $Headers = @{
+        'Accept' = "*/*"
+        'Content-Type' = "application/json"
+        'Authorization' = "Basic $Base64AuthInfo"
+    }
+    $Body = @{
+        'type' = "$TokenType"
+        'description' = "generated from New-FortifyToken"
+    }
+    [System.Net.ServicePointManager]::ServerCertificateValidationCallback = { $True }
+    try  {
+        $Response = Invoke-RestMethod -Method Post -Uri "$SSCUri/api/v1/tokens" -Headers $Headers -Body $Body
+        Write-Host $Response
+        return $Response.data.token
+    } catch {
+        Write-Error -Exception $_.Exception -Message "SSC API call failed: $_"
+    }
+}
+Export-ModuleMember New-FortifyToken

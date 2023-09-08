@@ -11,16 +11,21 @@ Set-JavaTools
 
 & minikube delete
 
-$RootDir = Split-Path -Path $PSScriptRoot -Parent
-
-$CertDir = "$($RootDir)\certificates"
+$CertDir = "$($PSScriptRoot)\certificates"
 If ((Test-Path -PathType container $CertDir))
 {
     Remove-Item -LiteralPath $CertDir -Force -Recurse
 }
 
-$SSCSecretDir = "$($RootDir)\ssc-secret"
+$SSCSecretDir = "$($PSScriptRoot)\ssc-secret"
 If ((Test-Path -PathType container $SSCSecretDir))
 {
     Remove-Item -LiteralPath $SSCSecretDir -Force -Recurse
 }
+
+$ScanCentralClientDir = "$($PSScriptRoot)\scancentral-client"
+If ((Test-Path -PathType Container $ScanCentralClientDir))
+{
+    Remove-Item -LiteralPath $ScanCentralClientDir -Force -Recurse
+}
+Remove-Item -LiteralPath "$($PSScriptRoot)\Fortify_ScanCentral_Client_Latest_x64.zip" -Force
