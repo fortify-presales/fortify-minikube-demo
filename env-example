@@ -1,0 +1,51 @@
+# Set the following depending on what components you wish to install
+# Just leave blank/empty if you don't want to install the component
+INSTALL_LIM=1
+INSTALL_SSC=1
+INSTALL_SCSAST=1
+INSTALL_SCDAST=
+# Minikube settings
+MINIKUBE_MEM=8192
+MINIKUBE_CPUS=2
+# Default Signing Password (generate using `openssl rand -base64 32`)
+SIGNING_PASSWORD=i7fcOOYEggukICyjmfII1Hk2WErN5Mcae5SzSpAObGU=
+# Default SSC Admin User
+SSC_ADMIN_USER=admin
+SSC_ADMIN_PASSWORD=admin
+# DockerHub login credentials to fortifydocker organisation
+DOCKERHUB_USERNAME=_YOUR_ACCOUNT_HERE_
+DOCKERHUB_PASSWORD=_YOUR_PASSWORD_HERE_
+# Path to openssl - use OpenSSL from Git on Windows
+#OPENSSL_PATH=C:\\Program Files\\Git\\mingw64\\bin\\openssl.exe
+# Path to openssl on Linux
+OPENSSL_PATH=/usr/bin/openssl
+# Version on ScanCentral to use
+SCANCENTRAL_VERSION=24.2
+# Fortify Demo App to create
+SSC_APP_NAME=FortifyDemoApp
+SSC_APP_VER_NAME=1.0
+# LIM configuration
+LIM_ADMIN_USER=limadm
+LIM_ADMIN_PASSWORD=_YOUR_PASSWORD_HERE_
+LIM_POOL_NAME=Default
+LIM_POOL_PASSWORD=_YOUR_PASSWORD_HERE_
+# ScanCentral DAST Upgrade repo
+SCDAST_UPGRADE_REPO=_YOUR_UPGRADE_REPO_
+SCDAST_UPGRADE_REPO_VER=23.1.180.ubi8.0
+# Version of Helm charts to ise
+LIM_HELM_VERSION=24.2.0-2
+SSC_HELM_VERSION=1.1.2320154
+SCSAST_HELM_VERSION=23.1.0
+SCDAST_HELM_VERSION=23.1.0
+MYSQL_HELM_VERSION=9.3.1
+POSTGRES_HELM_VERSION=11.9.0
+# The following values will be replaced by scripts
+LIM_URL=
+LIM_API_URL=
+SSC_URL=
+SCSAST_URL=
+SCDAST_URL=
+CLIENT_AUTH_TOKEN=
+WORKER_AUTH_TOKEN=
+SHARED_SECRET=
+SSC_CI_TOKEN=

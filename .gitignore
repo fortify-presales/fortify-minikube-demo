@@ -22,8 +22,12 @@ gradle-app.setting
 
 .env
 fortify.license
-.idea/
 certificates
 ssc-secret
+lim
+helm-lim
+ssc
+*.tgz
 fcli.env
 *.fpr
+jdk-17-jre-linux-x64/lib/security/cacerts

@@ -1,30 +1,39 @@
-# Fortify minikube demo (Windows)
+# Fortify minikube demo
 
-This repository contains some example scripts to setup a working Fortify ScanCentral SAST/DAST
-demo environment using the [Fortify Helm Charts](https://github.com/fortify/helm3-charts) on Windows. 
-It includes a deployment of Fortify Software Security Center (SSC) and Fortify ScanCentral SAST/DAST created using 
-[minikube](https://minikube.sigs.k8s.io/docs/). 
+This repository contains some example scripts to setup a working Fortify demo environment using [minikube](https://minikube.sigs.k8s.io/docs/)
+and the [Fortify Helm Charts](https://github.com/fortify/helm3-charts). 
 
-Minikube is a tool that allows you to run a single-node Kubernetes cluster locally. It is useful for developing and testing applications that are designed to run on Kubernetes.
+Minikube is a tool that allows you to run a single-node Kubernetes cluster locally. 
+It is useful for developing and testing applications that are designed to run on Kubernetes.
+
+It includes a deployment of:
+ [ ] Fortify License Infrastructure Manger (LIM)
+ [ ] Fortify Software Security Center (SSC)
+ [ ] ScanCentral SAST
+ [ ] ScanCentral DAST
 
 ## Prerequisites
 
-### Hyper-V
+### Linux environment with Docker installed
 
-Install **Hyper-V**: https://minikube.sigs.k8s.io/docs/drivers/hyperv/
+See [here](https://gist.github.com/wholroyd/748e09ca0b78897750791172b2abb051) as an example for Ubuntu on WSL2
 
 ### Minikube
 
-Install **minikube**: https://minikube.sigs.k8s.io/docs/start/
+Install **minikube**: https://minikube.sigs.k8s.io/docs/start
+
+### Kubernetes command line
+
+Install **kubectl**: https://kubernetes.io/docs/tasks/tools/
 
 ### Helm
 
-Install **helm**: https://helm.sh/docs/intro/quickstart/
+Install **helm**: https://helm.sh/docs/intro/install/
 
 ### OpenSSL
 
 You will need OpenSSL (https://www.openssl.org/) to create a self-signed wildcard certificate. You can install OpenSSL 
-using the OS package manager or use the version that is already available with the Git command line tool..
+using the OS package manager or use the version that is already available with the Git command line tool.
 
 ### fortify.license file
 
@@ -35,10 +44,9 @@ Place this file in the "root" directory of the project.
 
 You will need Docker Hub credentials to access the private docker images in the [fortifydocker](https://hub.docker.com/u/fortifydocker) organisation.
 
-### License and Infrastructure Manager and ScanCentral DAST and WebInspect licenses
+### ScanCentral DAST and WebInspect licenses
 
-ScanCentral DAST requires a working LIM instance with a license pool for WebInspect scanners. Unfortunately, LIM does not currently support Linux, so you cannot install it as part of this deployment.
-Follow standard procedures to install and configure LIM on a Windows machine or using Windows containers. **LIM must be accessed in API mode. Using the URL for LIM service will not work.**
+A working license for ScanCentral DAST and WebInspect if deploying ScanCentral DAST 
 
 ### ScanCentral DAST Configuration tool with SecureBase container image
 
@@ -126,6 +134,20 @@ Note: Do not place this file in source control.
 
 ## Install environment
 
+```
+minikube start --driver docker --static-ip 192.168.200.200
+minikube dashboard &
+minikube docker-env
+eval $(minikube -p minikube docker-env)
+docker login -u ftfyse
+[dckr_pat_I24mLcW9gaZynAertdrNo2OrOwg]
+docker pull fortifydocker/lim:24.2.ubi.8
+cd lim
+./start.
+kubectl --namespace default port-forward $POD_NAME 8801:$CONTAINER_PORT &
+```
+
+login as lim_admin and DEFAULT_LIM_PASSWORD
 Run the following command to start minikube and create a Fortify ScanCentral SAST Environment:
 
 ```aidl

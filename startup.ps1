@@ -1,17 +1,10 @@
-# Example script to start minikube and install Fortify SSC and ScanCentral SAST/DAST
+# Example script to start minikube and install Fortify LIM, SSC and ScanCentral SAST/DAST
 
 # Parameters
 param (
     [Parameter(Mandatory=$false)]
-    [switch]$RecreateCertificates,
-    [Parameter(Mandatory=$false)]
-    [switch]$SkipSCSAST,
-    [Parameter(Mandatory=$false)]
-    [switch]$SkipSCDAST
+    [switch]$RecreateCertificates
 )
-
-$InstallSCSAST = (-not $SkipSCSAST)
-$InstallSCDAST = (-not $SkipSCDAST)
 
 Write-Host "Fortify minikube startup script"
 
@@ -21,7 +14,12 @@ Set-PSPlatform
 
 # Import local environment specific settings
 $EnvSettings = $(ConvertFrom-StringData -StringData (Get-Content (Join-Path "." -ChildPath ".env") | Where-Object {-not ($_.StartsWith('#'))} | Out-String))
+$EnvFile = Join-Path $PSScriptRoot -ChildPath ".env"
 
+$InstallLIM = $EnvSettings['INSTALL_LIM']
+$InstallSSC = $EnvSettings['INSTALL_SSC']
+$InstallSCSAST = $EnvSettings['INSTALL_SCSAST']
+$InstallSCDAST = $EnvSettings['INSTALL_SCDAST']
 $MINIKUBE_MEM = $EnvSettings['MINIKUBE_MEM']
 $MINIKUBE_CPUS = $EnvSettings['MINIKUBE_CPUS']
 $SSC_ADMIN_USER = $EnvSettings['SSC_ADMIN_USER']
@@ -30,6 +28,7 @@ $DOCKERHUB_USERNAME = $EnvSettings['DOCKERHUB_USERNAME']
 $DOCKERHUB_PASSWORD = $EnvSettings['DOCKERHUB_PASSWORD']
 $OPENSSL = $EnvSettings['OPENSSL_PATH']
 $SCANCENTRAL_VERSION = $EnvSettings['SCANCENTRAL_VERSION']
+$LIM_HELM_VERSION = $EnvSettings['LIM_HELM_VERSION']
 $SSC_HELM_VERSION = $EnvSettings['SSC_HELM_VERSION']
 $SCSAST_HELM_VERSION = $EnvSettings['SCSAST_HELM_VERSION']
 $SCDAST_HELM_VERSION = $EnvSettings['SCDAST_HELM_VERSION']
@@ -43,6 +42,7 @@ $LIM_ADMIN_PASSWORD = $EnvSettings['LIM_ADMIN_PASSWORD']
 $LIM_POOL_NAME = $EnvSettings['LIM_POOL_NAME']
 $LIM_POOL_PASSWORD = $EnvSettings['LIM_POOL_PASSWORD']
 
+# Set some defaults in case they are missing from .env file
 if ([string]::IsNullOrEmpty($MINIKUBE_MEM)) { $MINIKUBE_MEM = "8192" }
 if ([string]::IsNullOrEmpty($MINIKUBE_CPUS)) { $MINIKUBE_CPUS = "2" }
 if ([string]::IsNullOrEmpty($SSC_ADMIN_USER)) { $SSC_ADMIN_USER = "admin" }
@@ -50,19 +50,33 @@ if ([string]::IsNullOrEmpty($SSC_ADMIN_PASSWORD)) { $SSC_ADMIN_PASSWORD = "admin
 if ([string]::IsNullOrEmpty($DOCKERHUB_USERNAME)) { throw "DOCKER_USERNAME needs to be set in .env file" }
 if ([string]::IsNullOrEmpty($DOCKERHUB_PASSWORD)) { throw "DOCKER_PASSWORD needs to be set in .env file" }
 if ([string]::IsNullOrEmpty($SCANCENTRAL_VERSION)) { $SCANCENTRAL_VERSION = "22.2.0" }
-if ([string]::IsNullOrEmpty($SSC_HELM_VERSION)) { $SSC_HELM_VERSION = "1.1.2221008" }
+if ([string]::IsNullOrEmpty($LIM_HELM_VERSION)) { $LIM_HELM_VERSION = "24.2.0-2" }
+if ([string]::IsNullOrEmpty($SSC_HELM_VERSION)) { $SSC_HELM_VERSION = "1.1.2420186+24.2.0.0186" }
 if ([string]::IsNullOrEmpty($SCSAST_HELM_VERSION)) { $SCSAST_HELM_VERSION = "22.2.0" }
 if ([string]::IsNullOrEmpty($SCDAST_HELM_VERSION)) { $SCDAST_HELM_VERSION = "22.2.1" }
 if ([string]::IsNullOrEmpty($MYSQL_HELM_VERSION)) { $MYSQL_HELM_VERSION = "9.3.1" }
 if ([string]::IsNullOrEmpty($POSTGRES_HELM_VERSION)) { $POSTGRES_HELM_VERSION = "11.9.0" }
 if ([string]::IsNullOrEmpty($OPENSSL)) { $OPENSSL = "openssl" }
+if ($InstallLIM)
+{
+    # we will set LIM_API_URL on completion
+    #if ([string]::IsNullOrEmpty($LIM_API_URL)) { throw "LIM_API_URL needs to be set in .env file" }
+    if ([string]::IsNullOrEmpty($LIM_ADMIN_USER)) { throw "LIM_ADMIN_USER needs to be set in .env file" }
+    if ([string]::IsNullOrEmpty($LIM_ADMIN_PASSWORD)) { throw "LIM_ADMIN_PASSWORD needs to be set in .env file" }
+    if ([string]::IsNullOrEmpty($LIM_POOL_NAME)) { throw "LIM_POOL_NAME needs to be set in .env file" }
+    if ([string]::IsNullOrEmpty($LIM_POOL_PASSWORD)) { throw "LIM_POOL_PASSWORD needs to be set in .env file" }
+}
+if ($InstallSSC)
+{
+    # any other required SSC settings
+}
 if ($InstallSCSAST)
 {
     # any other required SCSAST settings
 }
 if ($InstallSCDAST)
 {
-    if ([string]::IsNullOrEmpty($LIM_API_URL)) { throw "LIM_API_URL needs to be set in .env file" }
+    #if ([string]::IsNullOrEmpty($LIM_API_URL)) { throw "LIM_API_URL needs to be set in .env file" }
     if ([string]::IsNullOrEmpty($LIM_ADMIN_USER)) { throw "LIM_ADMIN_USER needs to be set in .env file" }
     if ([string]::IsNullOrEmpty($LIM_ADMIN_PASSWORD)) { throw "LIM_ADMIN_PASSWORD needs to be set in .env file" }
     if ([string]::IsNullOrEmpty($LIM_POOL_NAME)) { throw "LIM_POOL_NAME needs to be set in .env file" }
@@ -96,10 +110,13 @@ else
     & minikube start --memory $MINIKUBE_MEM --cpus $MINIKUBE_CPUS --driver=$MinikubeDriver $UseStaticIP
     Start-Sleep -Seconds 5
     & minikube addons enable ingress
+    & minikube addons enable metrics-server
+    #& minikube addons enable yakd
     Write-Host "minikube is running ..."
 }
 
 $MinikubeIP = (minikube ip)
+$LIMUrl = "lim.$($MinikubeIP.Replace('.','-')).nip.io"
 $SSCUrl = "ssc.$($MinikubeIP.Replace('.','-')).nip.io"
 $SCSASTUrl = "scsast.$($MinikubeIP.Replace('.','-')).nip.io"
 $SCDASTAPIUrl = "scdastapi.$($MinikubeIP.Replace('.','-')).nip.io"
@@ -134,10 +151,10 @@ else
 
     & "$OPENSSL" req -newkey rsa:2048 -nodes -keyout key.pem -x509 -days 365 -out certificate.pem -subj $CertUrl
     & "$OPENSSL" x509 -inform PEM -in certificate.pem -outform DER -out certificate.cer
+    & "$OPENSSL" pkcs12 -export -name ssc -in certificate.pem -inkey key.pem -out keystore.p12 -password pass:changeit
+    & "$OPENSSL" pkcs12 -export -name lim -in certificate.pem -inkey key.pem -out certificate.pfx -password pass:changeit
 
     kubectl create secret tls wildcard-certificate --cert=certificate.pem --key=key.pem
-
-    & "$OPENSSL" pkcs12 -export -name ssc -in certificate.pem -inkey key.pem -out keystore.p12 -password pass:changeit
 
     & "$KeytoolExe" -importkeystore -destkeystore ssc-service.jks -srckeystore keystore.p12 -srcstoretype pkcs12 -alias ssc -srcstorepass changeit -deststorepass changeit
     & "$KeytoolExe" -import -trustcacerts -file certificate.pem -alias "wildcard-cert" -keystore truststore -storepass changeit -noprompt
@@ -154,76 +171,177 @@ else
 # run update to prevent spurious errors
 helm repo update
 
-# check if MySql is already running
-$MySqlStatus = Get-PodStatus -PodName mysql-0
-if ($MysqlStatus -eq "Running")
-{
-    Write-Host "MySQL is already running ..."
-}
-else
-{
-    Write-Host "Installing MySql ..."
-    & helm install mysql bitnami/mysql -f mysql-values.yaml --version $MYSQL_HELM_VERSION
-    Start-Sleep -Seconds 30
-    $MySqlStatus = Wait-UntilPodStatus -PodName mysql-0
-}
+#
+# License Infrastructure Manager (LIM)
+#
 
-# check if SSC is already running
-$SSCStatus = Get-PodStatus -PodName ssc-webapp-0
-if ($SSCStatus -eq "Running")
+if ($InstallLIM)
 {
-    Write-Host "SSC is already running ..."
-}
-else
-{
-    Write-Host "Installing SSC ..."
-
-    $SSCSecretDir = Join-Path $PSScriptRoot -ChildPath "ssc-secret"
-    If ((Test-Path -PathType container $SSCSecretDir))
+    # check if LIM is already running
+    $LIMStatus = Get-PodStatus -PodName lim-0
+    if ($LIMStatus -eq "Running")
     {
-        Remove-Item -LiteralPath $SSCSecretDir -Force -Recurse
+        Write-Host "LIM is already running ..."
     }
-    New-Item -ItemType Directory -Path $SSCSecretDir
+    else
+    {
 
-    Join-Path $PSScriptRoot -ChildPath "ssc.autoconfig" | Copy-Item -Destination $SSCSecretDir
-    Join-Path $PSScriptRoot -ChildPath "fortify.license" | Copy-Item -Destination $SSCSecretDir
-    Join-Path $CertDir -ChildPath "ssc-service.jks" |  Copy-Item -Destination $SSCSecretDir
-    Join-Path $CertDir -ChildPath "truststore" | Copy-Item -Destination $SSCSecretDir
+        $CertPem = Join-Path $CertDir -ChildPath "certificate.pem"
+        $CertKey = Join-Path $CertDir -ChildPath "key.pem"
+        $CertPfx = Join-Path $CertDir -ChildPath "certificate.pfx"
+        $LimPv = Join-Path $PSScriptRoot -ChildPath "lim-pv"
+        $LimPvc = Join-Path $PSScriptRoot -ChildPath "lim-pvc"
 
-    Set-Location $SSCSecretDir
+        kubectl delete secret lim-admin-credentials --ignore-not-found
+        kubectl create secret generic lim-admin-credentials `
+            --type=basic-auth `
+            --from-literal=username=$LIM_ADMIN_USER `
+            --from-literal=password=$LIM_ADMIN_PASSWORD
 
-    kubectl create secret generic ssc `
-        --from-file=. `
-        --from-literal=ssc-service.jks.password=changeit `
-        --from-literal=ssc-service.jks.key.password=changeit `
-        --from-literal=truststore.password=changeit
+        kubectl delete secret lim-jwt-security-key --ignore-not-found
+        kubectl create secret generic lim-jwt-security-key `
+            --type=Opaque `
+            --from-literal=token="$SIGNING_PASSWORD"
+            
+        kubectl delete secret lim-server-certificate --ignore-not-found    
+        kubectl create secret generic lim-server-certificate `
+            --type=TLS `
+            --from-file=tls.crt=$CertPem `
+            --from-file=tls.key=$CertKey
 
-    Set-Location $PSScriptRoot
+        kubectl delete secret lim-signing-certificate --ignore-not-found    
+        kubectl create secret generic lim-signing-certificate `
+            --type=Opaque `
+            --from-file=tls.pfx=$CertPfx
 
-    & helm repo add fortify https://fortify.github.io/helm3-charts
+        kubectl delete secret lim-signing-certificate-password --ignore-not-found    
+        kubectl create secret generic lim-signing-certificate-password `
+            --type=Opaque `
+            --from-literal=pfx.password=changeit
 
-    & helm install ssc fortify/ssc --version $SSC_HELM_VERSION `
-        --set urlHost=$SSCUrl `
-        --set imagePullSecrets[0].name=fortifydocker `
-        --set secretRef.name=ssc `
-        --set secretRef.keys.sscLicenseEntry=fortify.license `
-        --set secretRef.keys.sscAutoconfigEntry=ssc.autoconfig `
-        --set secretRef.keys.httpCertificateKeystoreFileEntry=ssc-service.jks `
-        --set secretRef.keys.httpCertificateKeystorePasswordEntry=ssc-service.jks.password `
-        --set secretRef.keys.httpCertificateKeyPasswordEntry=ssc-service.jks.key.password `
-        --set secretRef.keys.jvmTruststoreFileEntry=truststore `
-        --set secretRef.keys.jmvTruststorePasswordEntry=truststore.password `
-        --set resources=null
+        kubectl apply --filename=$LimPv
+        kubectl apply --filename=$LimPvc
 
-    $SSCStatus = Wait-UntilPodStatus -PodName ssc-webapp-0
+        helm install lim oci://registry-1.docker.io/fortifydocker/helm-lim --version $LIM_HELM_VERSION `
+            --set imagePullSecrets[0].name=fortifydocker `
+            --set dataPersistence.existingClaim=fortify-lim `
+            --set dataPersistence.storeLogs=true `
+            --set defaultAdministrator.credentialsSecretName=lim-admin-credentials `
+            --set defaultAdministrator.fullName="LIM Administrator" `
+            --set defaultAdministrator.email="limadm@ftfydemo.local" `
+            --set allowNonTrustedServerCertificate=true `
+            --set jwt.securityKeySecretName=lim-jwt-security-key `
+            --set serverCertificate.certificateSecretName=lim-server-certificate `
+            --set serverCertificate.certificatePasswordSecretName=lim-signing-server-certificate `
+            --set signingCertificate.certificateSecretName=lim-signing-certificate `
+            --set signingCertificate.certificatePasswordSecretName=lim-signing-certificate-password
 
-    kubectl create ingress ssc-ingress `
-        --rule="$($SSCUrl)/*=ssc-service:443,tls=wildcard-certificate" `
-        --annotation nginx.ingress.kubernetes.io/backend-protocol=HTTPS `
-        --annotation nginx.ingress.kubernetes.io/proxy-body-size='0' `
-        --annotation nginx.ingress.kubernetes.io/client-max-body-size='512M'
+        Write-Host
+        $LIMStatus = Wait-UntilPodStatus -PodName lim-0
 
+        kubectl create ingress lim-ingress `
+            --rule="$($LIMUrl)/*=lim:1433,tls=wildcard-certificate" `
+            --annotation nginx.ingress.kubernetes.io/backend-protocol=HTTPS `
+            --annotation nginx.ingress.kubernetes.io/proxy-body-size='0' `
+            --annotation nginx.ingress.kubernetes.io/client-max-body-size='512M'
+
+        if ($LIMStatus -eq "Running")
+        {
+            Update-EnvFile -File $EnvFile -Find "^LIM_URL=.*$" -Replace "LIM_URL=https://$($LIMUrl)"
+            Update-EnvFile -File $EnvFile -Find "^LIM_API_URL=.*$" -Replace "LIM_API_URL=https://$($LIMUrl)/LIM.API"
+        }
+    }
 }
+
+#
+# Software Security Center (SSC)
+#
+
+if ($InstallSSC)
+{
+    # check if SSC is already running
+    $SSCStatus = Get-PodStatus -PodName ssc-webapp-0
+    if ($SSCStatus -eq "Running")
+    {
+        Write-Host "SSC is already running ..."
+    }
+    else
+    {
+        # check if MySql is already running
+        $MySqlStatus = Get-PodStatus -PodName mysql-0
+        if ($MysqlStatus -eq "Running")
+        {
+            Write-Host "MySQL is already running ..."
+        }
+        else
+        {
+            Write-Host "Installing MySql ..."
+            & helm install mysql bitnami/mysql -f mysql-values.yaml --version $MYSQL_HELM_VERSION
+            Start-Sleep -Seconds 30
+            Write-Host
+            $MySqlStatus = Wait-UntilPodStatus -PodName mysql-0
+        }
+
+        Write-Host "Installing SSC ..."
+
+        $SSCSecretDir = Join-Path $PSScriptRoot -ChildPath "ssc-secret"
+        If ((Test-Path -PathType container $SSCSecretDir))
+        {
+            Remove-Item -LiteralPath $SSCSecretDir -Force -Recurse
+        }
+        New-Item -ItemType Directory -Path $SSCSecretDir
+
+        Join-Path $PSScriptRoot -ChildPath "ssc.autoconfig" | Copy-Item -Destination $SSCSecretDir
+        Join-Path $PSScriptRoot -ChildPath "fortify.license" | Copy-Item -Destination $SSCSecretDir
+        Join-Path $CertDir -ChildPath "ssc-service.jks" |  Copy-Item -Destination $SSCSecretDir
+        Join-Path $CertDir -ChildPath "truststore" | Copy-Item -Destination $SSCSecretDir
+
+        Set-Location $SSCSecretDir
+
+        kubectl create secret generic ssc `
+            --from-file=. `
+            --from-literal=ssc-service.jks.password=changeit `
+            --from-literal=ssc-service.jks.key.password=changeit `
+            --from-literal=truststore.password=changeit
+
+        Set-Location $PSScriptRoot
+
+        #& helm repo add fortify https://fortify.github.io/helm3-charts
+
+        # tar -xvzftar -xvzf ./ssc-1.1.2420186+24.2.0.0186.tgz
+        & helm install ssc ssc `
+            --set urlHost=$SSCUrl `
+            --set imagePullSecrets[0].name=fortifydocker `
+            --set secretRef.name=ssc `
+            --set secretRef.keys.sscLicenseEntry=fortify.license `
+            --set secretRef.keys.sscAutoconfigEntry=ssc.autoconfig `
+            --set secretRef.keys.httpCertificateKeystoreFileEntry=ssc-service.jks `
+            --set secretRef.keys.httpCertificateKeystorePasswordEntry=ssc-service.jks.password `
+            --set secretRef.keys.httpCertificateKeyPasswordEntry=ssc-service.jks.key.password `
+            --set secretRef.keys.jvmTruststoreFileEntry=truststore `
+            --set secretRef.keys.jmvTruststorePasswordEntry=truststore.password `
+            --set resources=null
+
+        Write-Host 
+        $SSCStatus = Wait-UntilPodStatus -PodName ssc-webapp-0
+
+        kubectl create ingress ssc-ingress `
+            --rule="$($SSCUrl)/*=ssc-service:443,tls=wildcard-certificate" `
+            --annotation nginx.ingress.kubernetes.io/backend-protocol=HTTPS `
+            --annotation nginx.ingress.kubernetes.io/proxy-body-size='0' `
+            --annotation nginx.ingress.kubernetes.io/client-max-body-size='512M'
+
+        if ($SSCStatus -eq "Running")
+        {
+            Update-EnvFile -File $EnvFile -Find "^SSC_URL=.*$" -Replace "SSC_URL=https://$($SSCUrl)"
+        }
+
+    }
+}    
+
+#
+# ScanCentral SAST
+#
 
 if ($InstallSCSAST)
 {
@@ -251,8 +369,24 @@ if ($InstallSCSAST)
             --set controller.ingress.tls[0].hosts[0]=$( $SCSASTUrl ) `
             --set controller.ingress.annotations."nginx\.ingress\.kubernetes\.io/proxy-body-size"="512m"
 
+        Write-Host
         $SCSastControllerStatus = Wait-UntilPodStatus -PodName scancentral-sast-controller-0
         $SCSastWorkerStatus = Wait-UntilPodStatus -PodName scancentral-sast-worker-linux-0
+
+        if ($SCSastControllerStatus -eq "Running")
+        {
+            $ClientAuthTokenBase64 = (kubectl get secret scancentral-sast -o jsonpath="{.data.scancentral-client-auth-token}")
+            $ClientAuthToken = [System.Text.Encoding]::ASCII.GetString([System.Convert]::FromBase64String($ClientAuthTokenBase64))
+            $WorkerAuthTokenBase64 = (kubectl get secret scancentral-sast -o jsonpath="{.data.scancentral-worker-auth-token}")
+            $WorkerAuthToken = [System.Text.Encoding]::ASCII.GetString([System.Convert]::FromBase64String($WorkerAuthTokenBase64))
+            $ScanCentralCtrlSecretBase64 = (kubectl get secret scancentral-sast -o jsonpath="{.data.scancentral-ssc-scancentral-ctrl-secret}")
+            $ScanCentralCtrlSecret = [System.Text.Encoding]::ASCII.GetString([System.Convert]::FromBase64String($ScanCentralCtrlSecretBase64))
+
+            Update-EnvFile -File $EnvFile -Find "^SCSAST_URL=.*$" -Replace "SCSAST_URL=https://$($SCSASTUrl)/scancentral-ctrl/"
+            Update-EnvFile -File $EnvFile -Find "^CLIENT_AUTH_TOKEN=.*$" -Replace "CLIENT_AUTH_TOKEN=$($ClientAuthToken)"
+            Update-EnvFile -File $EnvFile -Find "^WORKER_AUTH_TOKEN=.*$" -Replace "WORKER_AUTH_TOKEN=$($WorkerAuthToken)"
+            Update-EnvFile -File $EnvFile -Find "^SHARED_SECRET=.*$" -Replace "SHARED_SECRET=$($ScanCentralCtrlSecret)"
+        }
     }
 }
 
@@ -304,63 +438,26 @@ if ($InstallSCDAST)
         --set ingress.api.tls[0].secretName=wildcard-certificate `
         --set ingress.api.tls[0].hosts[0]="$( $SCDASTAPIUrl )"
 
-    Start-Sleep -Seconds 10
-}
+        Write-Host
+        $SCDastControllerStatus = Wait-UntilPodStatus -PodName scancentral-dast-controller-0
+        $SCDastSensorStatus = Wait-UntilPodStatus -PodName scancentral-dast-sensor-linux-0
 
-$SCSastControllerStatus = Get-PodStatus -PodName scancentral-sast-controller-0
-if ($SCSastControllerStatus -eq "Running")
-{
-    $ClientAuthTokenBase64 = (kubectl get secret scancentral-sast -o jsonpath="{.data.scancentral-client-auth-token}")
-    $ClientAuthToken = [System.Text.Encoding]::ASCII.GetString([System.Convert]::FromBase64String($ClientAuthTokenBase64))
-    $WorkerAuthTokenBase64 = (kubectl get secret scancentral-sast -o jsonpath="{.data.scancentral-worker-auth-token}")
-    $WorkerAuthToken = [System.Text.Encoding]::ASCII.GetString([System.Convert]::FromBase64String($WorkerAuthTokenBase64))
-    $ScanCentralCtrlSecretBase64 = (kubectl get secret scancentral-sast -o jsonpath="{.data.scancentral-ssc-scancentral-ctrl-secret}")
-    $ScanCentralCtrlSecret = [System.Text.Encoding]::ASCII.GetString([System.Convert]::FromBase64String($ScanCentralCtrlSecretBase64))
-}
-
-Write-Host "Updating environment variables in .env ..."
-$EnvFile = Join-Path $PSScriptRoot -ChildPath ".env"
-if ($SSCStatus -eq "Running")
-{
-    Update-EnvFile -File $EnvFile -Find "^SSC_URL=.*$" -Replace "SSC_URL=https://$($SSCUrl)"
-}
-if ($InstallSCSAST)
-{
-    Update-EnvFile -File $EnvFile -Find "^SCSAST_URL=.*$" -Replace "SCSAST_URL=https://$($SCSASTUrl)/scancentral-ctrl/"
-    Update-EnvFile -File $EnvFile -Find "^CLIENT_AUTH_TOKEN=.*$" -Replace "CLIENT_AUTH_TOKEN=$($ClientAuthToken)"
-    Update-EnvFile -File $EnvFile -Find "^WORKER_AUTH_TOKEN=.*$" -Replace "WORKER_AUTH_TOKEN=$($WorkerAuthToken)"
-    Update-EnvFile -File $EnvFile -Find "^SHARED_SECRET=.*$" -Replace "SHARED_SECRET=$($ScanCentralCtrlSecret)"
-}
-if ($InstallSCDAST)
-{
-    Update-EnvFile -File $EnvFile -Find "^SCDAST_URL=.*$" -Replace "SCDAST_URL=https://$($SCDASTAPIUrl)"
+        if ($SCDastControllerStatus -eq "Running")
+        {
+            Update-EnvFile -File $EnvFile -Find "^SCDAST_URL=.*$" -Replace "SCDAST_URL=https://$($SCDASTAPIUrl)"
+        }
 }
 
 Write-Host @"
 ================================================================================
-"@
 
-if ($SSCStatus -eq "Running")
-{
-    Write-Host "Software Security Center URL: https://$($SSCUrl)"
-}
-
-if ($InstallSCSAST)
-{
-    Write-Host "ScanCentral SAST Controller URL: https://$($SCSASTUrl)/scancentral-ctrl/"
-    Write-Host "Client Authentication Token: $($ClientAuthToken)"
-    Write-Host "Worker Authentication Token: $($WorkerAuthToken)"
-    Write-Host "ScanCentral Controller Shared Secret: $($ScanCentralCtrlSecret)"
-}
-if ($InstallSCDAST)
-{
-    Write-Host "ScanCentral DAST API URL: https://$($SCDASTAPIUrl)"
-}
-Write-Host @"
+Please check the ".env" file for URLs of LIM, SSC etc
 
 Note: after Enabling ScanCentral SAST/DAST from SSC restart SSC pod with:
 
 kubectl delete pod ssc-webapp-0
+
+kubectl port-forward svc/lim 8080:37562
 
 ================================================================================
 "@
