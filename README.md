@@ -134,20 +134,6 @@ Note: Do not place this file in source control.
 
 ## Install environment
 
-```
-minikube start --driver docker --static-ip 192.168.200.200
-minikube dashboard &
-minikube docker-env
-eval $(minikube -p minikube docker-env)
-docker login -u ftfyse
-[dckr_pat_I24mLcW9gaZynAertdrNo2OrOwg]
-docker pull fortifydocker/lim:24.2.ubi.8
-cd lim
-./start.
-kubectl --namespace default port-forward $POD_NAME 8801:$CONTAINER_PORT &
-```
-
-login as lim_admin and DEFAULT_LIM_PASSWORD
 Run the following command to start minikube and create a Fortify ScanCentral SAST Environment:
 
 ```aidl
