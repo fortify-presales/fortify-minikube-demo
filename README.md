@@ -16,7 +16,11 @@ It includes a deployment of:
 
 ### Linux environment with Docker installed
 
-See [here](https://gist.github.com/wholroyd/748e09ca0b78897750791172b2abb051) as an example for Ubuntu on WSL2
+See [here](https://gist.github.com/wholroyd/748e09ca0b78897750791172b2abb051) as an example for Ubuntu on WSL2.
+
+### PowerShell on Linux
+
+Install [PowerShell for Linux](https://learn.microsoft.com/en-us/powershell/scripting/install/installing-powershell-on-linux?view=powershell-7.4).
 
 ### Minikube
 
@@ -48,100 +52,41 @@ You will need Docker Hub credentials to access the private docker images in the 
 
 A working license for ScanCentral DAST and WebInspect if deploying ScanCentral DAST 
 
-### ScanCentral DAST Configuration tool with SecureBase container image
-
-ScanCentral DAST uses a configuration tool to initialize the database. 
-The configuration tool image that is hosted at Docker Hub does not include the SecureBase and does not work to initialize/migrate the database.
-ScanCentral DAST can be initialized, upgraded or configured automatically if `autoDeploy`: is `true` at **values.yaml**.
-By default, the helm chart uses **fortifydocker/scancentral-dast-config** image to run the autoDeploy job.
-This docker image does not include the file **DefaultData.zip** which contains the data to seed a new database or to upgrade
-from previous versions. As it lacks this file, autoDeploy will not be able to initialize or upgrade the database.
-
-- In GitHub create a Personal Access Token with access to GitHub Container Registry
-- On a machine with docker support, sign in to Fortify Customer Portal and download **ScanCentral_DAST_X.X.zip**
-- Extract the file **scancentral-dast-config-sb.tar** from within the Zip file **ScanCentral DAST - CLI Config Tool.zip** which itself is in **ScanCentral_DAST_X.X.zip**
-- On a command prompt, run the following commands:
-
-```
-export CR_PAT=<YOUR_PAT>
-docker load -i <PATH_TO_DIRECTORY>/scancentral-dast-config-linux.tar
-echo $CR_PAT | docker login ghcr.io -u <USERNAME> --password-stdin
-docker tag dast_configsb_redhat_linux:23.1.180.ubi8.0 ghcr.io/<DOCKER_REPO>/dast_configsb_redhat_linux:<IMAGE_VERSION>
-docker push ghcr.io/<DOCKER_REPO>/dast_configsb_redhat_linux:<IMAGE_VERSION>
-```
-
-where:
-- **<DOCKER_USERNAME>** is your GitHub username
-- **<DOCKER_PAT>** is your GitHub Personal Access token
-- **<PATH_TO_DIRECTORY>** is the directory where you extracted the tar file
-- **<DOCKER_REPO>** is your docker registry/repo in GitHub
-- **<IMAGE_VERSION>** is the version of the docker image you are using
-
-Change the image reference for the **upgradeJob** at `values.yaml`.
-
-```
-upgradeJob:
-repository: <DOCKER_REPO>/scancentral-dast-config-sb
-tag: "<IMAGE_VERSION>"
-pullPolicy: "IfNotPresent"
-```
-
 ## Environment preparation
 
-Create a `.env` file with settings that you wish to you, an example file is given below:
+Copy the file `env.example` to `.env`, e.g.
 
-```aidl
-# Default SSC Admin User
-SSC_ADMIN_USER=admin
-SSC_ADMIN_PASSWORD=admin
-# DockerHub login credentials to fortifydocker organisation
-DOCKERHUB_USERNAME=_YOUR_DOCKERHUB_LOGIN_
-DOCKERHUB_PASSWORD=_YOUR_DOCKERHUB_PASSWORD_
-# Path to openssl - use OpenSSL from Git on Windows
-OPENSSL_PATH=C:\\Program Files\\Git\\mingw64\\bin\\openssl.exe
-# Path to openssl on Linux
-#OPENSSL_PATH=/usr/bin/openssl
-# Version on ScanCentral to use
-SCANCENTRAL_VERSION=23.1
-# Fortify Demo App to create
-SSC_APP_NAME=FortifyDemoApp
-SSC_APP_VER_NAME=1.0
-# LIM configuration
-LIM_API_URL=http://_YOUR_LIM_SERVER_/LIM.API
-LIM_ADMIN_USER=admin
-LIM_ADMIN_PASSWORD=_YOUR_LIM_ADMIN_PASSWORD_
-LIM_POOL_NAME=Default
-LIM_POOL_PASSWORD=_YOUR_LIM_POOL_PASSWORD_
-# ScanCentral DAST Upgrade repo
-SCDAST_UPGRADE_REPO=_YOUR_UPGRADE_REPO_
-SCDAST_UPGRADE_REPO_VER=23.1.180.ubi8.0
-# Version of Helm charts to ise
-SSC_HELM_VERSION=1.1.2310148
-SCSAST_HELM_VERSION=23.1.0
-SCDAST_HELM_VERSION=23.1.0
-MYSQL_HELM_VERSION=9.3.1
-POSTGRES_HELM_VERSION=11.9.0
-# The following values will be replaced by scripts
-SSC_URL=
-SCSAST_URL=
-SCDAST_URL=
-CLIENT_AUTH_TOKEN=
-WORKER_AUTH_TOKEN=
-SHARED_SECRET=
-SSC_CI_TOKEN=
 ```
-Note: Do not place this file in source control.
+cp env-example .env
+```
+
+then edit the file as required. You can set the first few entries depending on which components
+you wish to install. For example to install everything except ScanCentral DAST:
+
+```
+# Set the following depending on what components you wish to install
+# Just leave blank/empty if you don't want to install the component
+INSTALL_LIM=1
+INSTALL_SSC=1
+INSTALL_SCSAST=1
+INSTALL_SCDAST=
+```
+
+The values at the bottom of the file, for URLs and credentials of the deployed environment
+will be updated as the deployment completes.
+
+**Note: Do not place this file in source control.**
+
 
 ## Install environment
 
 Run the following command to start minikube and create a Fortify ScanCentral SAST Environment:
 
 ```aidl
-.\startup.ps1
+pwsh ./startup.ps1
 ```
 
-It will take a while for everything to complete. You can specify the Fortify "components"
-to skip with the `-SkipSAST` or `-SkipDAST`.
+It will take a while for everything to complete. 
 
 Once the details of the environment are complete at the end you will need to login to Fortify
 SSC and enter the details of ScanCentral SAST/DAST as per the instructions.
@@ -149,21 +94,51 @@ SSC and enter the details of ScanCentral SAST/DAST as per the instructions.
 If you want to populate the Fortify environment with sample data, you can the following command:
 
 ```aidl
-.\scripts\populate.ps1
+pwsh ./scripts/populate.ps1
 ```
 
 Note: if you need to set/reset the Fortify SSC "admin" user's password you can use the following script:
 
 ```aidl
-.\scripts\reset_ssc_admin_user.ps1
+pwsh ./scripts/reset_ssc_admin_user.ps1
 ```
+
+## Install Licenses in LIM
+
+Run the following command to forward the LIM Service to a free port on your local machine, e.g. for port 8888:
+
+```
+kubectl port-forward svc/lim 8888:37562
+```
+
+Browse to https://127.0.0.1:8888 on your local machine and login using the values of `LIM_ADMIN_USER` and
+`LIM_ADMIN_PASSWORD` set in `.env`.
+
+Install your licenses and then you can stop the port forwarding (just Ctrl^C out).
+
+## Login to SSC
+
+Run the following command to forward the LIM Service to a free port on your local machine, e.g. for port 8443:
+
+```
+kubectl port-forward svc/ssc-service 8443:443
+```
+
+Browse to https://127.0.0.1:8443 on your local machine and login using the values of `SSC_ADMIN_USER` and
+`SSCADMIN_PASSWORD` set in `.env`. You will need to change the user's password on first login.
+
+Install your licenses and then you can stop the port forwarding (just Ctrl^C out).
+
+## Update environment
+
+You can re-run the `startup.ps1` script with different options set in the `.env` to deploy more components.
 
 ## Running sample scans
 
 You can run a ScanCentral SAST Scan using the included scripts and source code as follows:
 
 ```aidl
-.\scancentral_sast_scan.ps1
+pwsh ./scancentral_sast_scan.ps1
 ```
 
 ## Remove environment
@@ -171,5 +146,5 @@ You can run a ScanCentral SAST Scan using the included scripts and source code a
 If you wish to remove the minikube environment completely, you can use the following command:
 
 ```aidl
-.\shutdown.ps1
+pwsh ./shutdown.ps1
 ```

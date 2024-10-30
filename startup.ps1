@@ -22,6 +22,7 @@ $InstallSCSAST = $EnvSettings['INSTALL_SCSAST']
 $InstallSCDAST = $EnvSettings['INSTALL_SCDAST']
 $MINIKUBE_MEM = $EnvSettings['MINIKUBE_MEM']
 $MINIKUBE_CPUS = $EnvSettings['MINIKUBE_CPUS']
+$SIGNING_PASSWORD = $EnvSettings['SIGNING_PASSWORD']
 $SSC_ADMIN_USER = $EnvSettings['SSC_ADMIN_USER']
 $SSC_ADMIN_PASSWORD = $EnvSettings['SSC_ADMIN_PASSWORD']
 $DOCKERHUB_USERNAME = $EnvSettings['DOCKERHUB_USERNAME']
@@ -45,6 +46,7 @@ $LIM_POOL_PASSWORD = $EnvSettings['LIM_POOL_PASSWORD']
 # Set some defaults in case they are missing from .env file
 if ([string]::IsNullOrEmpty($MINIKUBE_MEM)) { $MINIKUBE_MEM = "8192" }
 if ([string]::IsNullOrEmpty($MINIKUBE_CPUS)) { $MINIKUBE_CPUS = "2" }
+if ([string]::IsNullOrEmpty($SIGNING_PASSWORD)) {  throw "SIGNING_PASSWORD needs to be set in .env file" }
 if ([string]::IsNullOrEmpty($SSC_ADMIN_USER)) { $SSC_ADMIN_USER = "admin" }
 if ([string]::IsNullOrEmpty($SSC_ADMIN_PASSWORD)) { $SSC_ADMIN_PASSWORD = "admin" }
 if ([string]::IsNullOrEmpty($DOCKERHUB_USERNAME)) { throw "DOCKER_USERNAME needs to be set in .env file" }
