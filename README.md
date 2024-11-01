@@ -48,6 +48,15 @@ Place this file in the "root" directory of the project.
 
 You will need Docker Hub credentials to access the private docker images in the [fortifydocker](https://hub.docker.com/u/fortifydocker) organisation.
 
+### SSC Helm Charts
+
+You will need the Helm charts from the Fortify SSC Server installation, this will be in the form of a `.tgz` file named
+`ssc-1.1.2420186+24.2.0.0186.tgz` or simlar. Extract the contents of this file in the root directory:
+
+```
+tar -xvzf ssc-1.1.2420186+24.2.0.0186.tgz
+```
+
 ### ScanCentral DAST and WebInspect licenses
 
 A working license for ScanCentral DAST and WebInspect if deploying ScanCentral DAST 
@@ -108,10 +117,10 @@ pwsh ./scripts/reset_ssc_admin_user.ps1
 Run the following command to forward the LIM Service to a free port on your local machine, e.g. for port 8888:
 
 ```
-kubectl port-forward svc/lim 8888:37562
+kubectl port-forward lim-0 8443:1443
 ```
 
-Browse to https://127.0.0.1:8888 on your local machine and login using the values of `LIM_ADMIN_USER` and
+Browse to https://localhost:8443 on your local machine and login using the values of `LIM_ADMIN_USER` and
 `LIM_ADMIN_PASSWORD` set in `.env`.
 
 Install your licenses and then you can stop the port forwarding (just Ctrl^C out).

@@ -198,7 +198,7 @@ if ($InstallLIM)
         kubectl create secret generic lim-admin-credentials `
             --type=basic-auth `
             --from-literal=username=$LIM_ADMIN_USER `
-            --from-literal=password=$LIM_ADMIN_PASSWORD
+            --from-literal=password="$LIM_ADMIN_PASSWORD"
 
         kubectl delete secret lim-jwt-security-key --ignore-not-found
         kubectl create secret generic lim-jwt-security-key `
@@ -311,7 +311,7 @@ if ($InstallSSC)
         #& helm repo add fortify https://fortify.github.io/helm3-charts
 
         # tar -xvzftar -xvzf ./ssc-1.1.2420186+24.2.0.0186.tgz
-        & helm install ssc ssc `
+        helm install ssc oci://registry-1.docker.io/fortifydocker/helm-ssc --version 24.4.0-2 `
             --set urlHost=$SSCUrl `
             --set imagePullSecrets[0].name=fortifydocker `
             --set secretRef.name=ssc `
@@ -410,35 +410,110 @@ if ($InstallSCDAST)
     }
 
     Write-Host "Installing ScanCentral DAST ..."
-    & helm install scancentral-dast fortify/scancentral-dast --version $SCDAST_HELM_VERSION --timeout 40m `
+
+    $CertPem = Join-Path $CertDir -ChildPath "certificate.pem"
+        $CertKey = Join-Path $CertDir -ChildPath "key.pem"
+        $CertPfx = Join-Path $CertDir -ChildPath "certificate.pfx"
+
+    kubectl delete secret lim-pool --ignore-not-found
+    kubectl create secret generic lim-pool `
+        --type='basic-auth' `
+        --from-literal=username=$LIM_POOL_NAME `
+        --from-literal=password="$LIM_POOL_PASSWORD"
+
+    kubectl delete secret scdast-db-owner --ignore-not-found
+    kubectl create secret generic scdast-db-owner `
+        --type='basic-auth' `
+        --from-literal=username=postgres `
+        --from-literal=password=password
+
+    kubectl delete secret scdast-db-standard --ignore-not-found
+    kubectl create secret generic scdast-db-standard `
+        --type='basic-auth' `
+        --from-literal=username=postgres `
+        --from-literal=password=
+        
+    kubectl delete secret scdast-service-token --ignore-not-found
+    kubectl create secret generic scdast-service-token `
+        --type='opaque' `
+        --from-literal=service-token="$SIGNING_PASSWORD"
+
+    kubectl delete secret scdast-ssc-serviceaccount --ignore-not-found
+    kubectl create secret generic scdast-ssc-serviceaccount `
+        --type='basic-auth' `
+        --from-literal=username=admin `
+        --from-literal=password="FortifyPassword123!"
+
+    kubectl delete secret api-server-certificate --ignore-not-found
+    kubectl create secret generic api-server-certificate `
+        --type=Opaque `
+        --from-file=tls.pfx=$CertPfx
+
+    kubectl delete secret api-server-certificate-password --ignore-not-found    
+    kubectl create secret generic api-server-certificate-password `
+        --type=Opaque `
+        --from-literal=password=changeit
+
+    kubectl delete secret utilityservice-server-certificate --ignore-not-found        
+    kubectl create secret generic utilityservice-server-certificate `
+        --type=Opaque `
+        --from-file=tls.pfx=$CertPfx
+
+    kubectl delete secret utilityservice-server-certificate-password --ignore-not-found        
+    kubectl create secret generic utilityservice-server-certificate-password `
+        --type=Opaque `
+        --from-literal=password=changeit
+    
+    #helm pull oci://registry-1.docker.io/fortifydocker/helm-scancentral-dast-core --version $SCDAST_HELM_VERSION
+    #tar -xvzfhelm-scancentral-dast-core-$($SCDAST_HELM_VERSION).tgz
+    helm install scancentral-dast-core oci://registry-1.docker.io/fortifydocker/helm-scancentral-dast-core --version $SCDAST_HELM_VERSION --timeout 60m `
         --set imagePullSecrets[0].name=fortifydocker `
-        --set images.upgradeJob.repository="$( $SCDAST_UPGRADE_REPO )" `
-        --set images.upgradeJob.tag="$( $SCDAST_UPGRADE_REPO_VER )" `
-        --set configuration.databaseSettings.databaseProvider=PostgreSQL `
-        --set configuration.databaseSettings.server=postgresql `
-        --set configuration.databaseSettings.database=scdast_db `
-        --set configuration.databaseSettings.dboLevelDatabaseAccount.username=postgres `
-        --set configuration.databaseSettings.dboLevelDatabaseAccount.password=password `
-        --set configuration.databaseSettings.standardDatabaseAccount.username=postgres `
-        --set configuration.databaseSettings.standardDatabaseAccount.password=password `
-        --set configuration.serviceToken=thisisaservicetoken `
-        --set configuration.sSCSettings.sSCRootUrl="https://$( $SSCUrl )" `
-        --set configuration.sSCSettings.serviceAccountUserName="$( $SSC_ADMIN_USER )" `
-        --set configuration.sSCSettings.serviceAccountPassword="$( $SSC_ADMIN_PASSWORD )" `
-        --set configuration.dASTApiSettings.corsOrigins[0]="https://$( $SSCUrl )" `
-        --set configuration.dASTApiSettings.corsOrigins[1]="https://$( $SCDASTAPIUrl )" `
-        --set configuration.lIMSettings.limUrl="$( $LIM_API_URL )" `
-        --set configuration.lIMSettings.serviceAccountUserName="$( $LIM_ADMIN_USER )" `
-        --set configuration.lIMSettings.serviceAccountPassword="$( $LIM_ADMIN_PASSWORD )" `
-        --set configuration.lIMSettings.defaultLimPoolName="$( $LIM_POOL_NAME )" `
-        --set configuration.lIMSettings.defaultLimPoolPassword="$( $LIM_POOL_PASSWORD )" `
-        --set configuration.lIMSettings.useLimRestApi=true `
-        --set ingress.api.enabled=true `
-        --set ingress.api.hosts[0].host="$( $SCDASTAPIUrl )" `
-        --set ingress.api.hosts[0].paths[0].path=/ `
-        --set ingress.api.hosts[0].paths[0].pathType=Prefix `
-        --set ingress.api.tls[0].secretName=wildcard-certificate `
-        --set ingress.api.tls[0].hosts[0]="$( $SCDASTAPIUrl )"
+        --set appsettings.lIMSettings.limUrl="https://lim.default.svc.cluster.local:37562" `
+        --set appsettings.sSCSettings.sSCRootUrl="https://ssc-service.default.svc.cluster.local:443" `
+        --set appsettings.dASTApiSettings.disableCorsOrigins=true `
+        --set appsettings.environmentSettings.allowNonTrustedServerCertificate=true `
+        --set appsettings.databaseSettings.databaseProvider=PostgreSQL `
+        --set appsettings.databaseSettings.server=postgresql `
+        --set database.dboLevelAccountCredentialsSecret=scdast-db-owner `
+        --set database.standardAccountCredentialsSecret=scdast-db-standard `
+        --set sscServiceAccountSecretName=scdast-ssc-serviceaccount `
+        --set serviceTokenSecretName=scdast-service-token `
+        --set limServiceAccountSecretName=lim-admin-credentials `
+        --set limDefaultPoolSecretName=lim-pool `
+        --set api.certificate.certificateSecretName=api-server-certificate `
+        --set api.certificate.certificateSecretName=api-server-certificate-password `
+        --set utilityService.certificate.certificateSecretName=api-server-certificate `
+        --set utilityService.certificate.certificateSecretName=api-server-certificate-password
+
+    #& helm install scancentral-dast fortify/scancentral-dast --version $SCDAST_HELM_VERSION --timeout 40m `
+    #    --set imagePullSecrets[0].name=fortifydocker `
+    #    --set images.upgradeJob.repository="$( $SCDAST_UPGRADE_REPO )" `
+    #    --set images.upgradeJob.tag="$( $SCDAST_UPGRADE_REPO_VER )" `
+    #    --set configuration.databaseSettings.databaseProvider=PostgreSQL `
+    #    --set configuration.databaseSettings.server=postgresql `
+    #    --set configuration.databaseSettings.database=scdast_db `
+    #    --set configuration.databaseSettings.dboLevelDatabaseAccount.username=postgres `
+    #    --set configuration.databaseSettings.dboLevelDatabaseAccount.password=password `
+    #    --set configuration.databaseSettings.standardDatabaseAccount.username=postgres `
+    #    --set configuration.databaseSettings.standardDatabaseAccount.password=password `
+    #    --set configuration.serviceToken=thisisaservicetoken `
+    #    --set configuration.sSCSettings.sSCRootUrl="https://$( $SSCUrl )" `
+    #    --set configuration.sSCSettings.serviceAccountUserName="$( $SSC_ADMIN_USER )" `
+    #    --set configuration.sSCSettings.serviceAccountPassword="$( $SSC_ADMIN_PASSWORD )" `
+    #    --set configuration.dASTApiSettings.corsOrigins[0]="https://$( $SSCUrl )" `
+    #    --set configuration.dASTApiSettings.corsOrigins[1]="https://$( $SCDASTAPIUrl )" `
+    #    --set configuration.lIMSettings.limUrl="$( $LIM_API_URL )" `
+    #    --set configuration.lIMSettings.serviceAccountUserName="$( $LIM_ADMIN_USER )" `
+    #    --set configuration.lIMSettings.serviceAccountPassword="$( $LIM_ADMIN_PASSWORD )" `
+    #    --set configuration.lIMSettings.defaultLimPoolName="$( $LIM_POOL_NAME )" `
+    #    --set configuration.lIMSettings.defaultLimPoolPassword="$( $LIM_POOL_PASSWORD )" `
+    #    --set configuration.lIMSettings.useLimRestApi=true `
+    #    --set ingress.api.enabled=true `
+    #    --set ingress.api.hosts[0].host="$( $SCDASTAPIUrl )" `
+    #    --set ingress.api.hosts[0].paths[0].path=/ `
+    #    --set ingress.api.hosts[0].paths[0].pathType=Prefix `
+    #    --set ingress.api.tls[0].secretName=wildcard-certificate `
+    #    --set ingress.api.tls[0].hosts[0]="$( $SCDASTAPIUrl )"
 
         Write-Host
         $SCDastControllerStatus = Wait-UntilPodStatus -PodName scancentral-dast-controller-0
