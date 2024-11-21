@@ -117,10 +117,10 @@ pwsh ./scripts/reset_ssc_admin_user.ps1
 Run the following command to forward the LIM Service to a free port on your local machine, e.g. for port 8888:
 
 ```
-kubectl port-forward lim-0 8443:1443
+kubectl port-forward svc/lim 8888:37562
 ```
 
-Browse to https://localhost:8443 on your local machine and login using the values of `LIM_ADMIN_USER` and
+Browse to https://127.0.0.1:8888 on your local machine and login using the values of `LIM_ADMIN_USER` and
 `LIM_ADMIN_PASSWORD` set in `.env`.
 
 Install your licenses and then you can stop the port forwarding (just Ctrl^C out).
@@ -135,8 +135,6 @@ kubectl port-forward svc/ssc-service 8443:443
 
 Browse to https://127.0.0.1:8443 on your local machine and login using the values of `SSC_ADMIN_USER` and
 `SSCADMIN_PASSWORD` set in `.env`. You will need to change the user's password on first login.
-
-Install your licenses and then you can stop the port forwarding (just Ctrl^C out).
 
 ## Update environment
 

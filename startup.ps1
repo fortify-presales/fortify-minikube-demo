@@ -51,11 +51,11 @@ if ([string]::IsNullOrEmpty($SSC_ADMIN_USER)) { $SSC_ADMIN_USER = "admin" }
 if ([string]::IsNullOrEmpty($SSC_ADMIN_PASSWORD)) { $SSC_ADMIN_PASSWORD = "admin" }
 if ([string]::IsNullOrEmpty($DOCKERHUB_USERNAME)) { throw "DOCKER_USERNAME needs to be set in .env file" }
 if ([string]::IsNullOrEmpty($DOCKERHUB_PASSWORD)) { throw "DOCKER_PASSWORD needs to be set in .env file" }
-if ([string]::IsNullOrEmpty($SCANCENTRAL_VERSION)) { $SCANCENTRAL_VERSION = "22.2.0" }
-if ([string]::IsNullOrEmpty($LIM_HELM_VERSION)) { $LIM_HELM_VERSION = "24.2.0-2" }
-if ([string]::IsNullOrEmpty($SSC_HELM_VERSION)) { $SSC_HELM_VERSION = "1.1.2420186+24.2.0.0186" }
-if ([string]::IsNullOrEmpty($SCSAST_HELM_VERSION)) { $SCSAST_HELM_VERSION = "22.2.0" }
-if ([string]::IsNullOrEmpty($SCDAST_HELM_VERSION)) { $SCDAST_HELM_VERSION = "22.2.1" }
+if ([string]::IsNullOrEmpty($SCANCENTRAL_VERSION)) { $SCANCENTRAL_VERSION = "24.4.0" }
+if ([string]::IsNullOrEmpty($LIM_HELM_VERSION)) { $LIM_HELM_VERSION = "24.4.0-2" }
+if ([string]::IsNullOrEmpty($SSC_HELM_VERSION)) { $SSC_HELM_VERSION = "24.4.0-2" }
+if ([string]::IsNullOrEmpty($SCSAST_HELM_VERSION)) { $SCSAST_HELM_VERSION = "24.4.0-2" }
+if ([string]::IsNullOrEmpty($SCDAST_HELM_VERSION)) { $SCDAST_HELM_VERSION = "24.4.0-2" }
 if ([string]::IsNullOrEmpty($MYSQL_HELM_VERSION)) { $MYSQL_HELM_VERSION = "9.3.1" }
 if ([string]::IsNullOrEmpty($POSTGRES_HELM_VERSION)) { $POSTGRES_HELM_VERSION = "11.9.0" }
 if ([string]::IsNullOrEmpty($OPENSSL)) { $OPENSSL = "openssl" }
@@ -89,12 +89,14 @@ if ($InstallSCDAST)
 if ($IsLinux)
 {
     $MinikubeDriver = "docker"
-    $UseStaticIP="--static-ip=192.168.200.200"
+    $UseStaticIP=" --static-ip=192.168.200.200"
+    $UsePorts=""
 }
 else
 {
     $MinikubeDriver = "hyperv"
     $UseStaticIP = ""
+    $UsePorts = ""
 }
 
 # Setup Java Environment and Tools
@@ -109,7 +111,7 @@ if ($MinikubeStatus -eq "Running")
 else
 {
     Write-Host "minikube not running ... starting ..."
-    & minikube start --memory $MINIKUBE_MEM --cpus $MINIKUBE_CPUS --driver=$MinikubeDriver $UseStaticIP
+    & minikube start --memory $MINIKUBE_MEM --cpus $MINIKUBE_CPUS --driver=$MinikubeDriver $UseStaticIP $UsePorts
     Start-Sleep -Seconds 5
     & minikube addons enable ingress
     & minikube addons enable metrics-server
@@ -311,9 +313,11 @@ if ($InstallSSC)
         #& helm repo add fortify https://fortify.github.io/helm3-charts
 
         # tar -xvzftar -xvzf ./ssc-1.1.2420186+24.2.0.0186.tgz
-        helm install ssc oci://registry-1.docker.io/fortifydocker/helm-ssc --version 24.4.0-2 `
+        helm install ssc oci://registry-1.docker.io/fortifydocker/helm-ssc --version $SSC_HELM_VERSION `
             --set urlHost=$SSCUrl `
             --set imagePullSecrets[0].name=fortifydocker `
+            --set image.repository="fortifydocker/ssc-webapp" `
+            --set image.tag="24.4.1.0005" `
             --set secretRef.name=ssc `
             --set secretRef.keys.sscLicenseEntry=fortify.license `
             --set secretRef.keys.sscAutoconfigEntry=ssc.autoconfig `
@@ -411,9 +415,16 @@ if ($InstallSCDAST)
 
     Write-Host "Installing ScanCentral DAST ..."
 
+    $LIMIP = (kubectl get service/lim -o jsonpath='{.spec.clusterIP}')
+    $LIMPort = (kubectl get service/lim -o jsonpath='{.spec.ports[0].port}')
+    $SSCIP = (kubectl get service/ssc-service -o jsonpath='{.spec.clusterIP}')
+    $SSCPort = (kubectl get service/ssc-service -o jsonpath='{.spec.ports[0].port}')
+    Write-Host "Using LIM: http://$( $LIMIP ):$( $LIMPort )/"
+    Write-Host "Using SSC: http://$( $SSCIP ):$( $SSCPort )"
+
     $CertPem = Join-Path $CertDir -ChildPath "certificate.pem"
-        $CertKey = Join-Path $CertDir -ChildPath "key.pem"
-        $CertPfx = Join-Path $CertDir -ChildPath "certificate.pfx"
+    $CertKey = Join-Path $CertDir -ChildPath "key.pem"
+    $CertPfx = Join-Path $CertDir -ChildPath "certificate.pfx"
 
     kubectl delete secret lim-pool --ignore-not-found
     kubectl create secret generic lim-pool `
@@ -431,7 +442,7 @@ if ($InstallSCDAST)
     kubectl create secret generic scdast-db-standard `
         --type='basic-auth' `
         --from-literal=username=postgres `
-        --from-literal=password=
+        --from-literal=password=password
         
     kubectl delete secret scdast-service-token --ignore-not-found
     kubectl create secret generic scdast-service-token `
@@ -442,7 +453,7 @@ if ($InstallSCDAST)
     kubectl create secret generic scdast-ssc-serviceaccount `
         --type='basic-auth' `
         --from-literal=username=admin `
-        --from-literal=password="FortifyPassword123!"
+        --from-literal=password=admin
 
     kubectl delete secret api-server-certificate --ignore-not-found
     kubectl create secret generic api-server-certificate `
@@ -466,11 +477,13 @@ if ($InstallSCDAST)
     
     #helm pull oci://registry-1.docker.io/fortifydocker/helm-scancentral-dast-core --version $SCDAST_HELM_VERSION
     #tar -xvzfhelm-scancentral-dast-core-$($SCDAST_HELM_VERSION).tgz
-    helm install scancentral-dast-core oci://registry-1.docker.io/fortifydocker/helm-scancentral-dast-core --version $SCDAST_HELM_VERSION --timeout 60m `
+    helm install scancentral-dast-core oci://registry-1.docker.io/fortifydocker/helm-scancentral-dast-core --version $SCDAST_HELM_VERSION `
+        --timeout 60m -f resource_override.yaml `
         --set imagePullSecrets[0].name=fortifydocker `
-        --set appsettings.lIMSettings.limUrl="https://lim.default.svc.cluster.local:37562" `
-        --set appsettings.sSCSettings.sSCRootUrl="https://ssc-service.default.svc.cluster.local:443" `
+        --set appsettings.lIMSettings.limUrl="https://lim:37562/" `
+        --set appsettings.sSCSettings.sSCRootUrl="https://$( $SSCIP ):$( $SSCPort )" `
         --set appsettings.dASTApiSettings.disableCorsOrigins=true `
+        --set appsettings.dASTApiSettings.corsOrigins[0]="https://$( $SSCIP ):$( $SSCPort )" `
         --set appsettings.environmentSettings.allowNonTrustedServerCertificate=true `
         --set appsettings.databaseSettings.databaseProvider=PostgreSQL `
         --set appsettings.databaseSettings.server=postgresql `
@@ -532,9 +545,15 @@ Please check the ".env" file for URLs of LIM, SSC etc
 
 Note: after Enabling ScanCentral SAST/DAST from SSC restart SSC pod with:
 
-kubectl delete pod ssc-webapp-0
+    kubectl delete pod ssc-webapp-0
 
-kubectl port-forward svc/lim 8080:37562
+To access LIM on https://127.0.0.1:8888
+
+    kubectl port-forward svc/lim 8888:37562
+
+To access SSC on https://127.0.0.1:8080/ssc
+
+    kubectl port-forward svc/ssc-service 8080:443
 
 ================================================================================
 "@

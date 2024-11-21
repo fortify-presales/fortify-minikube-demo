@@ -24,10 +24,9 @@ gradle-app.setting
 fortify.license
 certificates
 ssc-secret
-lim
-ssc
 helm-lim
 helm-ssc
+helm-scancentral-dast-core
 *.tgz
 fcli.env
 *.fpr
