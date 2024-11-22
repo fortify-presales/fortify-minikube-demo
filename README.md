@@ -106,13 +106,19 @@ If you want to populate the Fortify environment with sample data, you can the fo
 pwsh ./scripts/populate.ps1
 ```
 
-Note: if you need to set/reset the Fortify SSC "admin" user's password you can use the following script:
+Note: if you need to set/reset the Fortify SSC "admin" user's password you can run the following commands:
 
 ```aidl
-pwsh ./scripts/reset_ssc_admin_user.ps1
+kubectl exec --stdin --tty mysql-0 -- /bin/bash
+mysql -u root -p 
+[Enter password]
+use ssc_db; 
+update fortifyuser set requirePasswordChange='N';
+exit
+exit
 ```
 
-## Install Licenses in LIM
+## Installing Licenses in LIM
 
 Run the following command to forward the LIM Service to a free port on your local machine, e.g. for port 8888:
 
@@ -135,6 +141,28 @@ kubectl port-forward svc/ssc-service 8443:443
 
 Browse to https://127.0.0.1:8443 on your local machine and login using the values of `SSC_ADMIN_USER` and
 `SSCADMIN_PASSWORD` set in `.env`. You will need to change the user's password on first login.
+
+### Configuring ScanCentral SAST/DAST in SSC
+
+To configurate ScanCentral SAST in SSC, first run the following command to forward the ScanCentral SAST Controller API
+to a free port on your local machine:
+
+```
+kubectl port-forward svc/scancentral-sast 8081:8080
+````
+
+Then in Administration -> Configuration "Enable ScanCentral SAST" and set Controller URL to: `https://127.0.0.1:8081/scancentral-ctrl`.
+
+
+To configurate ScanCentral DAST in SSC, first run the following command to forward the ScanCentral DAST API
+to a free port on your local machine:
+
+```
+kubectl port-forward svc/scancentral-dast-core-api 8082:8080
+````
+
+Then in Administration -> Configuration "Enable ScanCentral DAST" and set Server URL to: `https://127.0.0.1:8082`.
+
 
 ## Update environment
 

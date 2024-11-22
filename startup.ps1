@@ -29,6 +29,7 @@ $DOCKERHUB_USERNAME = $EnvSettings['DOCKERHUB_USERNAME']
 $DOCKERHUB_PASSWORD = $EnvSettings['DOCKERHUB_PASSWORD']
 $OPENSSL = $EnvSettings['OPENSSL_PATH']
 $SCANCENTRAL_VERSION = $EnvSettings['SCANCENTRAL_VERSION']
+$DEBRICKED_ACCESS_TOKEN = $EnvSettings['DEBRICKED_ACCESS_TOKEN']
 $LIM_HELM_VERSION = $EnvSettings['LIM_HELM_VERSION']
 $SSC_HELM_VERSION = $EnvSettings['SSC_HELM_VERSION']
 $SCSAST_HELM_VERSION = $EnvSettings['SCSAST_HELM_VERSION']
@@ -37,7 +38,6 @@ $MYSQL_HELM_VERSION = $EnvSettings['MYSQL_HELM_VERSION']
 $POSTGRES_HELM_VERSION = $EnvSettings['POSTGRES_HELM_VERSION']
 $SCDAST_UPGRADE_REPO = $EnvSettings['SCDAST_UPGRADE_REPO']
 $SCDAST_UPGRADE_REPO_VER = $EnvSettings['SCDAST_UPGRADE_REPO_VER']
-$LIM_API_URL = $EnvSettings['LIM_API_URL']
 $LIM_ADMIN_USER = $EnvSettings['LIM_ADMIN_USER']
 $LIM_ADMIN_PASSWORD = $EnvSettings['LIM_ADMIN_PASSWORD']
 $LIM_POOL_NAME = $EnvSettings['LIM_POOL_NAME']
@@ -51,6 +51,7 @@ if ([string]::IsNullOrEmpty($SSC_ADMIN_USER)) { $SSC_ADMIN_USER = "admin" }
 if ([string]::IsNullOrEmpty($SSC_ADMIN_PASSWORD)) { $SSC_ADMIN_PASSWORD = "admin" }
 if ([string]::IsNullOrEmpty($DOCKERHUB_USERNAME)) { throw "DOCKER_USERNAME needs to be set in .env file" }
 if ([string]::IsNullOrEmpty($DOCKERHUB_PASSWORD)) { throw "DOCKER_PASSWORD needs to be set in .env file" }
+if ([string]::IsNullOrEmpty($DEBRICKED_ACCESS_TOKEN)) { $DEBRICKED_ACCESS_TOKEN = "" }
 if ([string]::IsNullOrEmpty($SCANCENTRAL_VERSION)) { $SCANCENTRAL_VERSION = "24.4.0" }
 if ([string]::IsNullOrEmpty($LIM_HELM_VERSION)) { $LIM_HELM_VERSION = "24.4.0-2" }
 if ([string]::IsNullOrEmpty($SSC_HELM_VERSION)) { $SSC_HELM_VERSION = "24.4.0-2" }
@@ -120,10 +121,14 @@ else
 }
 
 $MinikubeIP = (minikube ip)
-$LIMUrl = "lim.$($MinikubeIP.Replace('.','-')).nip.io"
-$SSCUrl = "ssc.$($MinikubeIP.Replace('.','-')).nip.io"
-$SCSASTUrl = "scsast.$($MinikubeIP.Replace('.','-')).nip.io"
-$SCDASTAPIUrl = "scdastapi.$($MinikubeIP.Replace('.','-')).nip.io"
+#$LIMUrl = "lim.$($MinikubeIP.Replace('.','-')).nip.io"
+$LIMUrl = "https://lim:37562/"
+#$SSCUrl = "ssc.$($MinikubeIP.Replace('.','-')).nip.io"
+$SSCUrl = "https://ssc-service:443"
+#$SCSASTUrl = "scsast.$($MinikubeIP.Replace('.','-')).nip.io"
+$SCSASTUrl = "https://.../scancentral-ctrl"
+#$SCDASTAPIUrl = "scdastapi.$($MinikubeIP.Replace('.','-')).nip.io"
+$SCDASTAPIUrl = "https://scancentral-dast-core-api:34785"
 $CertUrl = "/CN=*.$($MinikubeIP.Replace('.','-')).nip.io"
 
 & helm repo add bitnami https://charts.bitnami.com/bitnami 2>$null
@@ -153,10 +158,12 @@ else
 
     Set-Location $CertDir
 
-    & "$OPENSSL" req -newkey rsa:2048 -nodes -keyout key.pem -x509 -days 365 -out certificate.pem -subj $CertUrl
+    & "$OPENSSL" req -newkey rsa:2048 -nodes -keyout key.pem -x509 -days 3650 -out certificate.pem -subj $CertUrl
     & "$OPENSSL" x509 -inform PEM -in certificate.pem -outform DER -out certificate.cer
     & "$OPENSSL" pkcs12 -export -name ssc -in certificate.pem -inkey key.pem -out keystore.p12 -password pass:changeit
     & "$OPENSSL" pkcs12 -export -name lim -in certificate.pem -inkey key.pem -out certificate.pfx -password pass:changeit
+    #& "$OPENSSL" req -newkey rsa:2048 -new -nodes -x509 -days 3650 -keyout api-server-key.pem -out api-server-cert.pem -subj $CertUrl
+    #& "$OPENSSL" pkcs12 -export -out api-server-cert.pfx -inkey api-server-key.pem -in api-server-cert.pem  -passout "pass:changeit"
 
     kubectl create secret tls wildcard-certificate --cert=certificate.pem --key=key.pem
 
@@ -243,11 +250,11 @@ if ($InstallLIM)
         Write-Host
         $LIMStatus = Wait-UntilPodStatus -PodName lim-0
 
-        kubectl create ingress lim-ingress `
-            --rule="$($LIMUrl)/*=lim:1433,tls=wildcard-certificate" `
-            --annotation nginx.ingress.kubernetes.io/backend-protocol=HTTPS `
-            --annotation nginx.ingress.kubernetes.io/proxy-body-size='0' `
-            --annotation nginx.ingress.kubernetes.io/client-max-body-size='512M'
+        #kubectl create ingress lim-ingress `
+        #    --rule="$($LIMUrl)/*=lim:1433,tls=wildcard-certificate" `
+        #    --annotation nginx.ingress.kubernetes.io/backend-protocol=HTTPS `
+        #    --annotation nginx.ingress.kubernetes.io/proxy-body-size='0' `
+        #    --annotation nginx.ingress.kubernetes.io/client-max-body-size='512M'
 
         if ($LIMStatus -eq "Running")
         {
@@ -314,7 +321,7 @@ if ($InstallSSC)
 
         # tar -xvzftar -xvzf ./ssc-1.1.2420186+24.2.0.0186.tgz
         helm install ssc oci://registry-1.docker.io/fortifydocker/helm-ssc --version $SSC_HELM_VERSION `
-            --set urlHost=$SSCUrl `
+            --set urlHost="$( $SSCUrl)" `
             --set imagePullSecrets[0].name=fortifydocker `
             --set image.repository="fortifydocker/ssc-webapp" `
             --set image.tag="24.4.1.0005" `
@@ -331,15 +338,15 @@ if ($InstallSSC)
         Write-Host 
         $SSCStatus = Wait-UntilPodStatus -PodName ssc-webapp-0
 
-        kubectl create ingress ssc-ingress `
-            --rule="$($SSCUrl)/*=ssc-service:443,tls=wildcard-certificate" `
-            --annotation nginx.ingress.kubernetes.io/backend-protocol=HTTPS `
-            --annotation nginx.ingress.kubernetes.io/proxy-body-size='0' `
-            --annotation nginx.ingress.kubernetes.io/client-max-body-size='512M'
+        #ubectl create ingress ssc-ingress `
+        #    --rule="$($SSCUrl)/*=ssc-service:443,tls=wildcard-certificate" `
+        #    --annotation nginx.ingress.kubernetes.io/backend-protocol=HTTPS `
+        #    --annotation nginx.ingress.kubernetes.io/proxy-body-size='0' `
+        #    --annotation nginx.ingress.kubernetes.io/client-max-body-size='512M'
 
         if ($SSCStatus -eq "Running")
         {
-            Update-EnvFile -File $EnvFile -Find "^SSC_URL=.*$" -Replace "SSC_URL=https://$($SSCUrl)"
+            Update-EnvFile -File $EnvFile -Find "^SSC_URL=.*$" -Replace "SSC_URL=$( $SSCUrl )"
         }
 
     }
@@ -363,8 +370,8 @@ if ($InstallSCSAST)
         helm install scancentral-sast fortify/scancentral-sast --version $SCSAST_HELM_VERSION `
             --set imagePullSecrets[0].name=fortifydocker `
             --set-file fortifyLicense=fortify.license `
-            --set controller.thisUrl="https://$( $SCSASTUrl )/scancentral-ctrl" `
-            --set controller.sscUrl="https://$( $SSCUrl )" `
+            --set controller.thisUrl="$( $SCSASTUrl )" `
+            --set controller.sscUrl="$( $SSCUrl )" `
             --set-file trustedCertificates[0]=certificates/certificate.pem `
             --set controller.persistence.enabled=false `
             --set controller.ingress.enabled=true `
@@ -415,12 +422,12 @@ if ($InstallSCDAST)
 
     Write-Host "Installing ScanCentral DAST ..."
 
-    $LIMIP = (kubectl get service/lim -o jsonpath='{.spec.clusterIP}')
-    $LIMPort = (kubectl get service/lim -o jsonpath='{.spec.ports[0].port}')
-    $SSCIP = (kubectl get service/ssc-service -o jsonpath='{.spec.clusterIP}')
-    $SSCPort = (kubectl get service/ssc-service -o jsonpath='{.spec.ports[0].port}')
-    Write-Host "Using LIM: http://$( $LIMIP ):$( $LIMPort )/"
-    Write-Host "Using SSC: http://$( $SSCIP ):$( $SSCPort )"
+    #$LIMIP = (kubectl get service/lim -o jsonpath='{.spec.clusterIP}')
+    #$LIMPort = (kubectl get service/lim -o jsonpath='{.spec.ports[0].port}')
+    #$SSCIP = (kubectl get service/ssc-service -o jsonpath='{.spec.clusterIP}')
+    #$SSCPort = (kubectl get service/ssc-service -o jsonpath='{.spec.ports[0].port}')
+    #Write-Host "Using LIM: http://$( $LIMIP ):$( $LIMPort )/"
+    #Write-Host "Using SSC: http://$( $SSCIP ):$( $SSCPort )"
 
     $CertPem = Join-Path $CertDir -ChildPath "certificate.pem"
     $CertKey = Join-Path $CertDir -ChildPath "key.pem"
@@ -452,8 +459,13 @@ if ($InstallSCDAST)
     kubectl delete secret scdast-ssc-serviceaccount --ignore-not-found
     kubectl create secret generic scdast-ssc-serviceaccount `
         --type='basic-auth' `
-        --from-literal=username=admin `
-        --from-literal=password=admin
+        --from-literal=username=$SSC_ADMIN_USER `
+        --from-literal=password="$SSC_ADMIN_PASSWORD"
+
+    #kubectl delete secret api-server-certificate --ignore-not-found
+    #kubectl create secret generic api-server-certificate --type=Opaque --from-file=tls.pfx=$APICertPfx
+    #kubectl delete secret api-server-certificate-password --ignore-not-found
+    #kubectl create secret generic api-server-certificate-password --type=Opaque --from-literal=pfx.password=changeit
 
     kubectl delete secret api-server-certificate --ignore-not-found
     kubectl create secret generic api-server-certificate `
@@ -463,7 +475,7 @@ if ($InstallSCDAST)
     kubectl delete secret api-server-certificate-password --ignore-not-found    
     kubectl create secret generic api-server-certificate-password `
         --type=Opaque `
-        --from-literal=password=changeit
+        --from-literal=pfx.password=changeit
 
     kubectl delete secret utilityservice-server-certificate --ignore-not-found        
     kubectl create secret generic utilityservice-server-certificate `
@@ -473,17 +485,18 @@ if ($InstallSCDAST)
     kubectl delete secret utilityservice-server-certificate-password --ignore-not-found        
     kubectl create secret generic utilityservice-server-certificate-password `
         --type=Opaque `
-        --from-literal=password=changeit
-    
+        --from-literal=pfx.password=changeit
+
     #helm pull oci://registry-1.docker.io/fortifydocker/helm-scancentral-dast-core --version $SCDAST_HELM_VERSION
     #tar -xvzfhelm-scancentral-dast-core-$($SCDAST_HELM_VERSION).tgz
     helm install scancentral-dast-core oci://registry-1.docker.io/fortifydocker/helm-scancentral-dast-core --version $SCDAST_HELM_VERSION `
         --timeout 60m -f resource_override.yaml `
         --set imagePullSecrets[0].name=fortifydocker `
-        --set appsettings.lIMSettings.limUrl="https://lim:37562/" `
-        --set appsettings.sSCSettings.sSCRootUrl="https://$( $SSCIP ):$( $SSCPort )" `
+        --set appsettings.lIMSettings.limUrl="$( $LIMUrl )" `
+        --set appsettings.sSCSettings.sSCRootUrl="$( $SSCUrl )" `
+        --set appsettings.debrickedSettings.accessToken="$( $DEBRICKED_ACCESS_TOKEN )" `
         --set appsettings.dASTApiSettings.disableCorsOrigins=true `
-        --set appsettings.dASTApiSettings.corsOrigins[0]="https://$( $SSCIP ):$( $SSCPort )" `
+        --set appsettings.dASTApiSettings.corsOrigins[0]="$( $SSCUrl )" `
         --set appsettings.environmentSettings.allowNonTrustedServerCertificate=true `
         --set appsettings.databaseSettings.databaseProvider=PostgreSQL `
         --set appsettings.databaseSettings.server=postgresql `
@@ -494,54 +507,26 @@ if ($InstallSCDAST)
         --set limServiceAccountSecretName=lim-admin-credentials `
         --set limDefaultPoolSecretName=lim-pool `
         --set api.certificate.certificateSecretName=api-server-certificate `
-        --set api.certificate.certificateSecretName=api-server-certificate-password `
-        --set utilityService.certificate.certificateSecretName=api-server-certificate `
-        --set utilityService.certificate.certificateSecretName=api-server-certificate-password
-
-    #& helm install scancentral-dast fortify/scancentral-dast --version $SCDAST_HELM_VERSION --timeout 40m `
-    #    --set imagePullSecrets[0].name=fortifydocker `
-    #    --set images.upgradeJob.repository="$( $SCDAST_UPGRADE_REPO )" `
-    #    --set images.upgradeJob.tag="$( $SCDAST_UPGRADE_REPO_VER )" `
-    #    --set configuration.databaseSettings.databaseProvider=PostgreSQL `
-    #    --set configuration.databaseSettings.server=postgresql `
-    #    --set configuration.databaseSettings.database=scdast_db `
-    #    --set configuration.databaseSettings.dboLevelDatabaseAccount.username=postgres `
-    #    --set configuration.databaseSettings.dboLevelDatabaseAccount.password=password `
-    #    --set configuration.databaseSettings.standardDatabaseAccount.username=postgres `
-    #    --set configuration.databaseSettings.standardDatabaseAccount.password=password `
-    #    --set configuration.serviceToken=thisisaservicetoken `
-    #    --set configuration.sSCSettings.sSCRootUrl="https://$( $SSCUrl )" `
-    #    --set configuration.sSCSettings.serviceAccountUserName="$( $SSC_ADMIN_USER )" `
-    #    --set configuration.sSCSettings.serviceAccountPassword="$( $SSC_ADMIN_PASSWORD )" `
-    #    --set configuration.dASTApiSettings.corsOrigins[0]="https://$( $SSCUrl )" `
-    #    --set configuration.dASTApiSettings.corsOrigins[1]="https://$( $SCDASTAPIUrl )" `
-    #    --set configuration.lIMSettings.limUrl="$( $LIM_API_URL )" `
-    #    --set configuration.lIMSettings.serviceAccountUserName="$( $LIM_ADMIN_USER )" `
-    #    --set configuration.lIMSettings.serviceAccountPassword="$( $LIM_ADMIN_PASSWORD )" `
-    #    --set configuration.lIMSettings.defaultLimPoolName="$( $LIM_POOL_NAME )" `
-    #    --set configuration.lIMSettings.defaultLimPoolPassword="$( $LIM_POOL_PASSWORD )" `
-    #    --set configuration.lIMSettings.useLimRestApi=true `
-    #    --set ingress.api.enabled=true `
-    #    --set ingress.api.hosts[0].host="$( $SCDASTAPIUrl )" `
-    #    --set ingress.api.hosts[0].paths[0].path=/ `
-    #    --set ingress.api.hosts[0].paths[0].pathType=Prefix `
-    #    --set ingress.api.tls[0].secretName=wildcard-certificate `
-    #    --set ingress.api.tls[0].hosts[0]="$( $SCDASTAPIUrl )"
+        --set api.certificate.certificatePasswordSecretName=api-server-certificate-password `
+        --set api.certificate.certificatePasswordSecretKey=pfx.password `
+        --set utilityService.certificate.certificateSecretName=utilityservice-server-certificate `
+        --set utilityService.certificate.certificatePasswordSecretName=utilityservice-server-certificate-password `
+        --set utilityService.certificate.certificatePasswordSecretKey=pfx.password
 
         Write-Host
         $SCDastControllerStatus = Wait-UntilPodStatus -PodName scancentral-dast-controller-0
-        $SCDastSensorStatus = Wait-UntilPodStatus -PodName scancentral-dast-sensor-linux-0
+        #$SCDastSensorStatus = Wait-UntilPodStatus -PodName scancentral-dast-sensor-linux-0
 
         if ($SCDastControllerStatus -eq "Running")
         {
-            Update-EnvFile -File $EnvFile -Find "^SCDAST_URL=.*$" -Replace "SCDAST_URL=https://$($SCDASTAPIUrl)"
+            Update-EnvFile -File $EnvFile -Find "^SCDAST_URL=.*$" -Replace "SCDAST_URL=$($SCDASTAPIUrl)"
         }
+
+        # TODO: Start Sensor
 }
 
 Write-Host @"
 ================================================================================
-
-Please check the ".env" file for URLs of LIM, SSC etc
 
 Note: after Enabling ScanCentral SAST/DAST from SSC restart SSC pod with:
 
