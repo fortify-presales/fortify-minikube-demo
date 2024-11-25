@@ -27,6 +27,7 @@ ssc-secret
 helm-lim
 helm-ssc
 helm-scancentral-dast-core
+helm-scancentral-dast-scanner
 *.tgz
 fcli.env
 *.fpr

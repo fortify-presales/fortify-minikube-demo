@@ -20,6 +20,8 @@ $InstallLIM = $EnvSettings['INSTALL_LIM']
 $InstallSSC = $EnvSettings['INSTALL_SSC']
 $InstallSCSAST = $EnvSettings['INSTALL_SCSAST']
 $InstallSCDAST = $EnvSettings['INSTALL_SCDAST']
+$InstallSCSASTScanner = $EnvSettings['INSTALL_SCSAST_SCANNER']
+$InstallSCDASTScanner = $EnvSettings['INSTALL_SCDAST_SCANNER']
 $MINIKUBE_MEM = $EnvSettings['MINIKUBE_MEM']
 $MINIKUBE_CPUS = $EnvSettings['MINIKUBE_CPUS']
 $SIGNING_PASSWORD = $EnvSettings['SIGNING_PASSWORD']
@@ -34,6 +36,8 @@ $LIM_HELM_VERSION = $EnvSettings['LIM_HELM_VERSION']
 $SSC_HELM_VERSION = $EnvSettings['SSC_HELM_VERSION']
 $SCSAST_HELM_VERSION = $EnvSettings['SCSAST_HELM_VERSION']
 $SCDAST_HELM_VERSION = $EnvSettings['SCDAST_HELM_VERSION']
+$SCDAST_SCANNER_HELM_VERSION = $EnvSettings['SCDAST_SCANNER_HELM_VERSION']
+$SCSAST_SCANNER_HELM_VERSION = $EnvSettings['SCSAST_SCANNER_HELM_VERSION']
 $MYSQL_HELM_VERSION = $EnvSettings['MYSQL_HELM_VERSION']
 $POSTGRES_HELM_VERSION = $EnvSettings['POSTGRES_HELM_VERSION']
 $SCDAST_UPGRADE_REPO = $EnvSettings['SCDAST_UPGRADE_REPO']
@@ -420,125 +424,160 @@ if ($InstallSCDAST)
         $MySqlStatus = Wait-UntilPodStatus -PodName postgresql-0
     }
 
-    Write-Host "Installing ScanCentral DAST ..."
+    $SCDastApiStatus = Get-PodStatus -PodName scancentral-dast-core-api-0
+    if ($SCDastApiStatus -eq "Running")
+    {
+        Write-Host "ScanCentral DAST is already running ..."
+    }
+    else
+    {
+        Write-Host "Installing ScanCentral DAST ..."
 
-    #$LIMIP = (kubectl get service/lim -o jsonpath='{.spec.clusterIP}')
-    #$LIMPort = (kubectl get service/lim -o jsonpath='{.spec.ports[0].port}')
-    #$SSCIP = (kubectl get service/ssc-service -o jsonpath='{.spec.clusterIP}')
-    #$SSCPort = (kubectl get service/ssc-service -o jsonpath='{.spec.ports[0].port}')
-    #Write-Host "Using LIM: http://$( $LIMIP ):$( $LIMPort )/"
-    #Write-Host "Using SSC: http://$( $SSCIP ):$( $SSCPort )"
+        #$LIMIP = (kubectl get service/lim -o jsonpath='{.spec.clusterIP}')
+        #$LIMPort = (kubectl get service/lim -o jsonpath='{.spec.ports[0].port}')
+        #$SSCIP = (kubectl get service/ssc-service -o jsonpath='{.spec.clusterIP}')
+        #$SSCPort = (kubectl get service/ssc-service -o jsonpath='{.spec.ports[0].port}')
+        #Write-Host "Using LIM: http://$( $LIMIP ):$( $LIMPort )/"
+        #Write-Host "Using SSC: http://$( $SSCIP ):$( $SSCPort )"
 
-    $CertPem = Join-Path $CertDir -ChildPath "certificate.pem"
-    $CertKey = Join-Path $CertDir -ChildPath "key.pem"
-    $CertPfx = Join-Path $CertDir -ChildPath "certificate.pfx"
+        $CertPem = Join-Path $CertDir -ChildPath "certificate.pem"
+        $CertKey = Join-Path $CertDir -ChildPath "key.pem"
+        $CertPfx = Join-Path $CertDir -ChildPath "certificate.pfx"
 
-    kubectl delete secret lim-pool --ignore-not-found
-    kubectl create secret generic lim-pool `
-        --type='basic-auth' `
-        --from-literal=username=$LIM_POOL_NAME `
-        --from-literal=password="$LIM_POOL_PASSWORD"
+        kubectl delete secret lim-pool --ignore-not-found
+        kubectl create secret generic lim-pool `
+            --type='basic-auth' `
+            --from-literal=username=$LIM_POOL_NAME `
+            --from-literal=password="$LIM_POOL_PASSWORD"
 
-    kubectl delete secret scdast-db-owner --ignore-not-found
-    kubectl create secret generic scdast-db-owner `
-        --type='basic-auth' `
-        --from-literal=username=postgres `
-        --from-literal=password=password
+        kubectl delete secret scdast-db-owner --ignore-not-found
+        kubectl create secret generic scdast-db-owner `
+            --type='basic-auth' `
+            --from-literal=username=postgres `
+            --from-literal=password=password
 
-    kubectl delete secret scdast-db-standard --ignore-not-found
-    kubectl create secret generic scdast-db-standard `
-        --type='basic-auth' `
-        --from-literal=username=postgres `
-        --from-literal=password=password
-        
-    kubectl delete secret scdast-service-token --ignore-not-found
-    kubectl create secret generic scdast-service-token `
-        --type='opaque' `
-        --from-literal=service-token="$SIGNING_PASSWORD"
+        kubectl delete secret scdast-db-standard --ignore-not-found
+        kubectl create secret generic scdast-db-standard `
+            --type='basic-auth' `
+            --from-literal=username=postgres `
+            --from-literal=password=password
+            
+        kubectl delete secret scdast-service-token --ignore-not-found
+        kubectl create secret generic scdast-service-token `
+            --type='opaque' `
+            --from-literal=service-token="$SIGNING_PASSWORD"
 
-    kubectl delete secret scdast-ssc-serviceaccount --ignore-not-found
-    kubectl create secret generic scdast-ssc-serviceaccount `
-        --type='basic-auth' `
-        --from-literal=username=$SSC_ADMIN_USER `
-        --from-literal=password="$SSC_ADMIN_PASSWORD"
+        kubectl delete secret scdast-ssc-serviceaccount --ignore-not-found
+        kubectl create secret generic scdast-ssc-serviceaccount `
+            --type='basic-auth' `
+            --from-literal=username=$SSC_ADMIN_USER `
+            --from-literal=password="$SSC_ADMIN_PASSWORD"
 
-    #kubectl delete secret api-server-certificate --ignore-not-found
-    #kubectl create secret generic api-server-certificate --type=Opaque --from-file=tls.pfx=$APICertPfx
-    #kubectl delete secret api-server-certificate-password --ignore-not-found
-    #kubectl create secret generic api-server-certificate-password --type=Opaque --from-literal=pfx.password=changeit
+        #kubectl delete secret api-server-certificate --ignore-not-found
+        #kubectl create secret generic api-server-certificate --type=Opaque --from-file=tls.pfx=$APICertPfx
+        #kubectl delete secret api-server-certificate-password --ignore-not-found
+        #kubectl create secret generic api-server-certificate-password --type=Opaque --from-literal=pfx.password=changeit
 
-    kubectl delete secret api-server-certificate --ignore-not-found
-    kubectl create secret generic api-server-certificate `
-        --type=Opaque `
-        --from-file=tls.pfx=$CertPfx
+        kubectl delete secret api-server-certificate --ignore-not-found
+        kubectl create secret generic api-server-certificate `
+            --type=Opaque `
+            --from-file=tls.pfx=$CertPfx
 
-    kubectl delete secret api-server-certificate-password --ignore-not-found    
-    kubectl create secret generic api-server-certificate-password `
-        --type=Opaque `
-        --from-literal=pfx.password=changeit
+        kubectl delete secret api-server-certificate-password --ignore-not-found    
+        kubectl create secret generic api-server-certificate-password `
+            --type=Opaque `
+            --from-literal=pfx.password=changeit
 
-    kubectl delete secret utilityservice-server-certificate --ignore-not-found        
-    kubectl create secret generic utilityservice-server-certificate `
-        --type=Opaque `
-        --from-file=tls.pfx=$CertPfx
+        kubectl delete secret utilityservice-server-certificate --ignore-not-found        
+        kubectl create secret generic utilityservice-server-certificate `
+            --type=Opaque `
+            --from-file=tls.pfx=$CertPfx
 
-    kubectl delete secret utilityservice-server-certificate-password --ignore-not-found        
-    kubectl create secret generic utilityservice-server-certificate-password `
-        --type=Opaque `
-        --from-literal=pfx.password=changeit
+        kubectl delete secret utilityservice-server-certificate-password --ignore-not-found        
+        kubectl create secret generic utilityservice-server-certificate-password `
+            --type=Opaque `
+            --from-literal=pfx.password=changeit
 
-    #helm pull oci://registry-1.docker.io/fortifydocker/helm-scancentral-dast-core --version $SCDAST_HELM_VERSION
-    #tar -xvzfhelm-scancentral-dast-core-$($SCDAST_HELM_VERSION).tgz
-    helm install scancentral-dast-core oci://registry-1.docker.io/fortifydocker/helm-scancentral-dast-core --version $SCDAST_HELM_VERSION `
-        --timeout 60m -f resource_override.yaml `
-        --set imagePullSecrets[0].name=fortifydocker `
-        --set appsettings.lIMSettings.limUrl="$( $LIMUrl )" `
-        --set appsettings.sSCSettings.sSCRootUrl="$( $SSCUrl )" `
-        --set appsettings.debrickedSettings.accessToken="$( $DEBRICKED_ACCESS_TOKEN )" `
-        --set appsettings.dASTApiSettings.disableCorsOrigins=true `
-        --set appsettings.dASTApiSettings.corsOrigins[0]="$( $SSCUrl )" `
-        --set appsettings.environmentSettings.allowNonTrustedServerCertificate=true `
-        --set appsettings.databaseSettings.databaseProvider=PostgreSQL `
-        --set appsettings.databaseSettings.server=postgresql `
-        --set database.dboLevelAccountCredentialsSecret=scdast-db-owner `
-        --set database.standardAccountCredentialsSecret=scdast-db-standard `
-        --set sscServiceAccountSecretName=scdast-ssc-serviceaccount `
-        --set serviceTokenSecretName=scdast-service-token `
-        --set limServiceAccountSecretName=lim-admin-credentials `
-        --set limDefaultPoolSecretName=lim-pool `
-        --set api.certificate.certificateSecretName=api-server-certificate `
-        --set api.certificate.certificatePasswordSecretName=api-server-certificate-password `
-        --set api.certificate.certificatePasswordSecretKey=pfx.password `
-        --set utilityService.certificate.certificateSecretName=utilityservice-server-certificate `
-        --set utilityService.certificate.certificatePasswordSecretName=utilityservice-server-certificate-password `
-        --set utilityService.certificate.certificatePasswordSecretKey=pfx.password
+        #helm pull oci://registry-1.docker.io/fortifydocker/helm-scancentral-dast-core --version $SCDAST_HELM_VERSION
+        #tar -xvzfhelm-scancentral-dast-core-$($SCDAST_HELM_VERSION).tgz
+        helm install scancentral-dast-core oci://registry-1.docker.io/fortifydocker/helm-scancentral-dast-core --version $SCDAST_HELM_VERSION `
+            --timeout 60m -f resource_override_dast_core.yaml `
+            --set imagePullSecrets[0].name=fortifydocker `
+            --set appsettings.lIMSettings.limUrl="$( $LIMUrl )" `
+            --set appsettings.sSCSettings.sSCRootUrl="$( $SSCUrl )" `
+            --set appsettings.debrickedSettings.accessToken="$( $DEBRICKED_ACCESS_TOKEN )" `
+            --set appsettings.dASTApiSettings.disableCorsOrigins=true `
+            --set appsettings.dASTApiSettings.corsOrigins[0]="$( $SSCUrl )" `
+            --set appsettings.environmentSettings.allowNonTrustedServerCertificate=true `
+            --set appsettings.databaseSettings.databaseProvider=PostgreSQL `
+            --set appsettings.databaseSettings.server=postgresql `
+            --set database.dboLevelAccountCredentialsSecret=scdast-db-owner `
+            --set database.standardAccountCredentialsSecret=scdast-db-standard `
+            --set sscServiceAccountSecretName=scdast-ssc-serviceaccount `
+            --set serviceTokenSecretName=scdast-service-token `
+            --set limServiceAccountSecretName=lim-admin-credentials `
+            --set limDefaultPoolSecretName=lim-pool `
+            --set api.certificate.certificateSecretName=api-server-certificate `
+            --set api.certificate.certificatePasswordSecretName=api-server-certificate-password `
+            --set api.certificate.certificatePasswordSecretKey=pfx.password `
+            --set utilityService.certificate.certificateSecretName=utilityservice-server-certificate `
+            --set utilityService.certificate.certificatePasswordSecretName=utilityservice-server-certificate-password `
+            --set utilityService.certificate.certificatePasswordSecretKey=pfx.password
 
         Write-Host
         $SCDastControllerStatus = Wait-UntilPodStatus -PodName scancentral-dast-controller-0
-        #$SCDastSensorStatus = Wait-UntilPodStatus -PodName scancentral-dast-sensor-linux-0
 
         if ($SCDastControllerStatus -eq "Running")
         {
             Update-EnvFile -File $EnvFile -Find "^SCDAST_URL=.*$" -Replace "SCDAST_URL=$($SCDASTAPIUrl)"
         }
 
-        # TODO: Start Sensor
+    }
+}
+
+if ($InstallSCDASTScanner)
+{
+    $SCDastScannerStatus = Get-PodStatus -PodName scancentral-dast-scanner-0
+    if ($SCDastScannerStatus -eq "Running")
+    {
+        Write-Host "ScanCentral DAST Scanner is already running ..."
+    }
+    else
+    {
+        Write-Host "Installing ScanCentral DAST Scanner ..."
+
+        helm install scancentral-dast-scanner oci://registry-1.docker.io/fortifydocker/helm-scancentral-dast-scanner --version $SCDAST_SCANNER_HELM_VERSION `
+            --timeout 60m -f resource_override_dast_sensor.yaml `
+            --set imagePullSecrets[0].name=fortifydocker `
+            --set scannerDescription="Linux DAST Scanner" `
+            --set allowNonTrustedServerCertificate=true `
+            --set dastApiServiceURL=$( $SCDASTAPIUrl ) `
+            --set serviceTokenSecretName=scdast-service-token
+            
+        Write-Host
+        $SCDastScannerStatus = Wait-UntilPodStatus -PodName scancentral-dast-scanner-0
+    }
+
 }
 
 Write-Host @"
 ================================================================================
 
-Note: after Enabling ScanCentral SAST/DAST from SSC restart SSC pod with:
-
-    kubectl delete pod ssc-webapp-0
-
 To access LIM on https://127.0.0.1:8888
 
     kubectl port-forward svc/lim 8888:37562
 
-To access SSC on https://127.0.0.1:8080/ssc
+To access SSC on https://127.0.0.1:8443
 
-    kubectl port-forward svc/ssc-service 8080:443
+    kubectl port-forward svc/ssc-service 8443:443
+
+To startup ScanCentral DAST API on https://127.0.0.1:1444
+
+    kubectl port-forward svc/scancentral-dast-core-api 1444:34785
+
+Note: after Enabling ScanCentral SAST/DAST from SSC restart SSC pod with:
+
+    kubectl delete pod ssc-webapp-0
 
 ================================================================================
 "@
