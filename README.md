@@ -78,7 +78,9 @@ you wish to install. For example to install everything except ScanCentral DAST:
 INSTALL_LIM=1
 INSTALL_SSC=1
 INSTALL_SCSAST=1
+INSTALL_SCSAST_SCANNER=1
 INSTALL_SCDAST=
+INSTALL_SCDAST_SCANNER=
 ```
 
 The values at the bottom of the file, for URLs and credentials of the deployed environment
@@ -133,7 +135,7 @@ Install your licenses and then you can stop the port forwarding (just Ctrl^C out
 
 ## Login to SSC
 
-Run the following command to forward the LIM Service to a free port on your local machine, e.g. for port 8443:
+Run the following command to forward the SSC Service to a free port on your local machine, e.g. for port 8443:
 
 ```
 kubectl port-forward svc/ssc-service 8443:443
@@ -154,26 +156,31 @@ kubectl port-forward svc/scancentral-sast 8081:8080
 Then in Administration -> Configuration "Enable ScanCentral SAST" and set Controller URL to: `https://127.0.0.1:8081/scancentral-ctrl`.
 
 
-To configurate ScanCentral DAST in SSC, first run the following command to forward the ScanCentral DAST API
+To configure ScanCentral DAST in SSC, first run the following command to forward the ScanCentral DAST API
 to a free port on your local machine:
 
 ```
-kubectl port-forward svc/scancentral-dast-core-api 8082:8080
+kubectl port-forward svc/scancentral-dast-core-api 1444:34785
 ````
 
-Then in Administration -> Configuration "Enable ScanCentral DAST" and set Server URL to: `https://127.0.0.1:8082`.
-
+Then in Administration -> Configuration "Enable ScanCentral DAST" and set Server URL to: `https://127.0.0.1:1444`.
 
 ## Update environment
 
 You can re-run the `startup.ps1` script with different options set in the `.env` to deploy more components.
 
-## Running sample scans
+## Stopping/Starting Minikube
 
-You can run a ScanCentral SAST Scan using the included scripts and source code as follows:
+You can stop minikube using:
 
-```aidl
-pwsh ./scancentral_sast_scan.ps1
+```
+minikube stop
+```
+
+this will keep the kubernetes cluster so that even after reboot of your machine you can restart the cluster with:
+
+```
+minikube start
 ```
 
 ## Remove environment

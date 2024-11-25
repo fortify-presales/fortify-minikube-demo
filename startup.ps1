@@ -40,8 +40,6 @@ $SCDAST_SCANNER_HELM_VERSION = $EnvSettings['SCDAST_SCANNER_HELM_VERSION']
 $SCSAST_SCANNER_HELM_VERSION = $EnvSettings['SCSAST_SCANNER_HELM_VERSION']
 $MYSQL_HELM_VERSION = $EnvSettings['MYSQL_HELM_VERSION']
 $POSTGRES_HELM_VERSION = $EnvSettings['POSTGRES_HELM_VERSION']
-$SCDAST_UPGRADE_REPO = $EnvSettings['SCDAST_UPGRADE_REPO']
-$SCDAST_UPGRADE_REPO_VER = $EnvSettings['SCDAST_UPGRADE_REPO_VER']
 $LIM_ADMIN_USER = $EnvSettings['LIM_ADMIN_USER']
 $LIM_ADMIN_PASSWORD = $EnvSettings['LIM_ADMIN_PASSWORD']
 $LIM_POOL_NAME = $EnvSettings['LIM_POOL_NAME']
@@ -66,8 +64,6 @@ if ([string]::IsNullOrEmpty($POSTGRES_HELM_VERSION)) { $POSTGRES_HELM_VERSION = 
 if ([string]::IsNullOrEmpty($OPENSSL)) { $OPENSSL = "openssl" }
 if ($InstallLIM)
 {
-    # we will set LIM_API_URL on completion
-    #if ([string]::IsNullOrEmpty($LIM_API_URL)) { throw "LIM_API_URL needs to be set in .env file" }
     if ([string]::IsNullOrEmpty($LIM_ADMIN_USER)) { throw "LIM_ADMIN_USER needs to be set in .env file" }
     if ([string]::IsNullOrEmpty($LIM_ADMIN_PASSWORD)) { throw "LIM_ADMIN_PASSWORD needs to be set in .env file" }
     if ([string]::IsNullOrEmpty($LIM_POOL_NAME)) { throw "LIM_POOL_NAME needs to be set in .env file" }
@@ -88,8 +84,6 @@ if ($InstallSCDAST)
     if ([string]::IsNullOrEmpty($LIM_ADMIN_PASSWORD)) { throw "LIM_ADMIN_PASSWORD needs to be set in .env file" }
     if ([string]::IsNullOrEmpty($LIM_POOL_NAME)) { throw "LIM_POOL_NAME needs to be set in .env file" }
     if ([string]::IsNullOrEmpty($LIM_POOL_PASSWORD)) { throw "LIM_POOL_PASSWORD needs to be set in .env file" }
-    if ([string]::IsNullOrEmpty($SCDAST_UPGRADE_REPO)) { throw "SCDAST_UPGRADE_REPO needs to be set in .env file" }
-    if ([string]::IsNullOrEmpty($SCDAST_UPGRADE_REPO_VER)) { throw "SCDAST_UPGRADE_REPO_VER needs to be set in .env file" }
 }
 if ($IsLinux)
 {
@@ -120,7 +114,6 @@ else
     Start-Sleep -Seconds 5
     & minikube addons enable ingress
     & minikube addons enable metrics-server
-    #& minikube addons enable yakd
     Write-Host "minikube is running ..."
 }
 
@@ -166,8 +159,6 @@ else
     & "$OPENSSL" x509 -inform PEM -in certificate.pem -outform DER -out certificate.cer
     & "$OPENSSL" pkcs12 -export -name ssc -in certificate.pem -inkey key.pem -out keystore.p12 -password pass:changeit
     & "$OPENSSL" pkcs12 -export -name lim -in certificate.pem -inkey key.pem -out certificate.pfx -password pass:changeit
-    #& "$OPENSSL" req -newkey rsa:2048 -new -nodes -x509 -days 3650 -keyout api-server-key.pem -out api-server-cert.pem -subj $CertUrl
-    #& "$OPENSSL" pkcs12 -export -out api-server-cert.pfx -inkey api-server-key.pem -in api-server-cert.pem  -passout "pass:changeit"
 
     kubectl create secret tls wildcard-certificate --cert=certificate.pem --key=key.pem
 
@@ -260,11 +251,11 @@ if ($InstallLIM)
         #    --annotation nginx.ingress.kubernetes.io/proxy-body-size='0' `
         #    --annotation nginx.ingress.kubernetes.io/client-max-body-size='512M'
 
-        if ($LIMStatus -eq "Running")
-        {
-            Update-EnvFile -File $EnvFile -Find "^LIM_URL=.*$" -Replace "LIM_URL=https://$($LIMUrl)"
-            Update-EnvFile -File $EnvFile -Find "^LIM_API_URL=.*$" -Replace "LIM_API_URL=https://$($LIMUrl)/LIM.API"
-        }
+        #if ($LIMStatus -eq "Running")
+        #{
+        #    Update-EnvFile -File $EnvFile -Find "^LIM_URL=.*$" -Replace "LIM_URL=https://$($LIMUrl)"
+        #    Update-EnvFile -File $EnvFile -Find "^LIM_API_URL=.*$" -Replace "LIM_API_URL=https://$($LIMUrl)/LIM.API"
+        #}
     }
 }
 
@@ -321,9 +312,6 @@ if ($InstallSSC)
 
         Set-Location $PSScriptRoot
 
-        #& helm repo add fortify https://fortify.github.io/helm3-charts
-
-        # tar -xvzftar -xvzf ./ssc-1.1.2420186+24.2.0.0186.tgz
         helm install ssc oci://registry-1.docker.io/fortifydocker/helm-ssc --version $SSC_HELM_VERSION `
             --set urlHost="$( $SSCUrl)" `
             --set imagePullSecrets[0].name=fortifydocker `
@@ -348,10 +336,10 @@ if ($InstallSSC)
         #    --annotation nginx.ingress.kubernetes.io/proxy-body-size='0' `
         #    --annotation nginx.ingress.kubernetes.io/client-max-body-size='512M'
 
-        if ($SSCStatus -eq "Running")
-        {
-            Update-EnvFile -File $EnvFile -Find "^SSC_URL=.*$" -Replace "SSC_URL=$( $SSCUrl )"
-        }
+        #if ($SSCStatus -eq "Running")
+        #{
+        #    Update-EnvFile -File $EnvFile -Find "^SSC_URL=.*$" -Replace "SSC_URL=$( $SSCUrl )"
+        #}
 
     }
 }    
@@ -433,13 +421,6 @@ if ($InstallSCDAST)
     {
         Write-Host "Installing ScanCentral DAST ..."
 
-        #$LIMIP = (kubectl get service/lim -o jsonpath='{.spec.clusterIP}')
-        #$LIMPort = (kubectl get service/lim -o jsonpath='{.spec.ports[0].port}')
-        #$SSCIP = (kubectl get service/ssc-service -o jsonpath='{.spec.clusterIP}')
-        #$SSCPort = (kubectl get service/ssc-service -o jsonpath='{.spec.ports[0].port}')
-        #Write-Host "Using LIM: http://$( $LIMIP ):$( $LIMPort )/"
-        #Write-Host "Using SSC: http://$( $SSCIP ):$( $SSCPort )"
-
         $CertPem = Join-Path $CertDir -ChildPath "certificate.pem"
         $CertKey = Join-Path $CertDir -ChildPath "key.pem"
         $CertPfx = Join-Path $CertDir -ChildPath "certificate.pfx"
@@ -473,11 +454,6 @@ if ($InstallSCDAST)
             --from-literal=username=$SSC_ADMIN_USER `
             --from-literal=password="$SSC_ADMIN_PASSWORD"
 
-        #kubectl delete secret api-server-certificate --ignore-not-found
-        #kubectl create secret generic api-server-certificate --type=Opaque --from-file=tls.pfx=$APICertPfx
-        #kubectl delete secret api-server-certificate-password --ignore-not-found
-        #kubectl create secret generic api-server-certificate-password --type=Opaque --from-literal=pfx.password=changeit
-
         kubectl delete secret api-server-certificate --ignore-not-found
         kubectl create secret generic api-server-certificate `
             --type=Opaque `
@@ -498,8 +474,6 @@ if ($InstallSCDAST)
             --type=Opaque `
             --from-literal=pfx.password=changeit
 
-        #helm pull oci://registry-1.docker.io/fortifydocker/helm-scancentral-dast-core --version $SCDAST_HELM_VERSION
-        #tar -xvzfhelm-scancentral-dast-core-$($SCDAST_HELM_VERSION).tgz
         helm install scancentral-dast-core oci://registry-1.docker.io/fortifydocker/helm-scancentral-dast-core --version $SCDAST_HELM_VERSION `
             --timeout 60m -f resource_override_dast_core.yaml `
             --set imagePullSecrets[0].name=fortifydocker `
@@ -527,10 +501,10 @@ if ($InstallSCDAST)
         Write-Host
         $SCDastControllerStatus = Wait-UntilPodStatus -PodName scancentral-dast-controller-0
 
-        if ($SCDastControllerStatus -eq "Running")
-        {
-            Update-EnvFile -File $EnvFile -Find "^SCDAST_URL=.*$" -Replace "SCDAST_URL=$($SCDASTAPIUrl)"
-        }
+        #if ($SCDastControllerStatus -eq "Running")
+        #{
+        #    Update-EnvFile -File $EnvFile -Find "^SCDAST_URL=.*$" -Replace "SCDAST_URL=$($SCDASTAPIUrl)"
+        #}
 
     }
 }
