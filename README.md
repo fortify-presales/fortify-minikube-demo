@@ -21,10 +21,7 @@ See [here](https://gist.github.com/wholroyd/748e09ca0b78897750791172b2abb051) as
 ### PowerShell on Linux
 
 Install [PowerShell for Linux](https://learn.microsoft.com/en-us/powershell/scripting/install/installing-powershell-on-linux?view=powershell-7.4).
-
-### Minikube
-
-Install **minikube**: https://minikube.sigs.k8s.io/docs/start
+The scripts are written in PowerShell so that they could be used on Windows and Linux.
 
 ### Kubernetes command line
 
@@ -34,6 +31,10 @@ Install **kubectl**: https://kubernetes.io/docs/tasks/tools/
 
 Install **helm**: https://helm.sh/docs/intro/install/
 
+### Minikube
+
+Install **minikube**: https://minikube.sigs.k8s.io/docs/start
+
 ### OpenSSL
 
 You will need OpenSSL (https://www.openssl.org/) to create a self-signed wildcard certificate. You can install OpenSSL 
@@ -42,20 +43,12 @@ using the OS package manager or use the version that is already available with t
 ### fortify.license file
 
 A working **fortify.license** file for SSC and ScanCentral SAST.
-Place this file in the "root" directory of the project.
+Place this file in the "root" directory of this project.
 
 ### Dockerhub ***fortifydocker*** credentials
 
-You will need Docker Hub credentials to access the private docker images in the [fortifydocker](https://hub.docker.com/u/fortifydocker) organisation.
-
-### SSC Helm Charts
-
-You will need the Helm charts from the Fortify SSC Server installation, this will be in the form of a `.tgz` file named
-`ssc-1.1.2420186+24.2.0.0186.tgz` or simlar. Extract the contents of this file in the root directory:
-
-```
-tar -xvzf ssc-1.1.2420186+24.2.0.0186.tgz
-```
+You will need Docker Hub credentials to access the Helm charts and private docker images in the [fortifydocker](https://hub.docker.com/u/fortifydocker) organisation.
+Enter the username and password into the `.env` file (see below)
 
 ### ScanCentral DAST and WebInspect licenses
 
@@ -69,7 +62,7 @@ Copy the file `env.example` to `.env`, e.g.
 cp env-example .env
 ```
 
-then edit the file as required. You can set the first few entries depending on which components
+then edit the file as required. Set the first few entries depending on which components
 you wish to install. For example to install everything except ScanCentral DAST:
 
 ```
@@ -83,66 +76,58 @@ INSTALL_SCDAST=
 INSTALL_SCDAST_SCANNER=
 ```
 
-The values at the bottom of the file, for URLs and credentials of the deployed environment
-will be updated as the deployment completes.
+It is recommended to set the components incrementally so you can see what's going on,
+for example: set just `INSTALL_LIM=1` first then add `INSTALL_SSC=1` and so on.
 
-**Note: Do not place this file in source control.**
+**Do not place this file in source control.**
 
+## Install Fortify environment
 
-## Install environment
-
-Run the following command to start minikube and create a Fortify ScanCentral SAST Environment:
+Run the following command to start minikube and create the Fortify Environment:
 
 ```aidl
 pwsh ./startup.ps1
 ```
 
-It will take a while for everything to complete. 
-
-Once the details of the environment are complete at the end you will need to login to Fortify
-SSC and enter the details of ScanCentral SAST/DAST as per the instructions.
-
-If you want to populate the Fortify environment with sample data, you can the following command:
+It will take a while for everything to complete. If you want to see the progress and ensure everything
+is starting correctly you can start the minikube dashboard using:
 
 ```aidl
-pwsh ./scripts/populate.ps1
+minikube dashboard
 ```
 
-Note: if you need to set/reset the Fortify SSC "admin" user's password you can run the following commands:
+and browse to the URL it displays. Once the services have started you can expose them to your local
+machine (if using WSL for example) using the following command:
+
+```
+minikube tunnel
+```
+
+You might need to enter your (sudo) password. 
+The command prompt running this tunnel will need to be kep open while you are using the Fortify web applications.
+
+## Installing Licenses in LIM
+
+Browse to [https://lim.127-0-0-1.nip.io](https://lim.127-0-0-1.nip.io) on your local machine and login using the 
+values of `LIM_ADMIN_USER` and `LIM_ADMIN_PASSWORD` set in `.env`.
+
+## Login to SSC
+
+Browse to https://127.0.0.1:8443 on your local machine and login using the values of `SSC_ADMIN_USER` and
+`SSCADMIN_PASSWORD` set in `.env`.
+
+Note: if you want to keep the SSC "admin" user's default password of `admin` you can run the following commands
+before logging in:
 
 ```aidl
 kubectl exec --stdin --tty mysql-0 -- /bin/bash
 mysql -u root -p 
-[Enter password]
+[Enter "password"]
 use ssc_db; 
 update fortifyuser set requirePasswordChange='N';
 exit
 exit
 ```
-
-## Installing Licenses in LIM
-
-Run the following command to forward the LIM Service to a free port on your local machine, e.g. for port 8888:
-
-```
-kubectl port-forward svc/lim 8888:37562
-```
-
-Browse to https://127.0.0.1:8888 on your local machine and login using the values of `LIM_ADMIN_USER` and
-`LIM_ADMIN_PASSWORD` set in `.env`.
-
-Install your licenses and then you can stop the port forwarding (just Ctrl^C out).
-
-## Login to SSC
-
-Run the following command to forward the SSC Service to a free port on your local machine, e.g. for port 8443:
-
-```
-kubectl port-forward svc/ssc-service 8443:443
-```
-
-Browse to https://127.0.0.1:8443 on your local machine and login using the values of `SSC_ADMIN_USER` and
-`SSCADMIN_PASSWORD` set in `.env`. You will need to change the user's password on first login.
 
 ### Configuring ScanCentral SAST/DAST in SSC
 
@@ -153,8 +138,7 @@ to a free port on your local machine:
 kubectl port-forward svc/scancentral-sast 8081:8080
 ````
 
-Then in Administration -> Configuration "Enable ScanCentral SAST" and set Controller URL to: `https://127.0.0.1:8081/scancentral-ctrl`.
-
+Then in `Administration -> Configuration "Enable ScanCentral SAST"` set `Controller URL` to: `https://127.0.0.1:8081/scancentral-ctrl`.
 
 To configure ScanCentral DAST in SSC, first run the following command to forward the ScanCentral DAST API
 to a free port on your local machine:
@@ -163,7 +147,7 @@ to a free port on your local machine:
 kubectl port-forward svc/scancentral-dast-core-api 1444:34785
 ````
 
-Then in Administration -> Configuration "Enable ScanCentral DAST" and set Server URL to: `https://127.0.0.1:1444`.
+Then in `Administration -> Configuration "Enable ScanCentral DAST"` set `Server URL` to: `https://127.0.0.1:1444`.
 
 ## Update environment
 
@@ -183,7 +167,7 @@ this will keep the kubernetes cluster so that even after reboot of your machine 
 minikube start
 ```
 
-## Remove environment
+## Remove Fortify environment
 
 If you wish to remove the minikube environment completely, you can use the following command:
 

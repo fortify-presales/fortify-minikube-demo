@@ -22,12 +22,14 @@ gradle-app.setting
 
 .env
 fortify.license
+fortify.keys
 certificates
 ssc-secret
 helm-lim
 helm-ssc
 helm-scancentral-dast-core
 helm-scancentral-dast-scanner
+helm-scancentral-sast
 *.tgz
 fcli.env
 *.fpr
