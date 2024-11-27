@@ -54,6 +54,10 @@ Enter the username and password into the `.env` file (see below)
 
 A working license for ScanCentral DAST and WebInspect if deploying ScanCentral DAST 
 
+### Fortify Command Line utility
+
+The `fcli` tool will be used to populate data and connect to the Fortify Environment.
+
 ## Environment preparation
 
 Copy the file `env.example` to `.env`, e.g.
@@ -71,7 +75,6 @@ you wish to install. For example to install everything except ScanCentral DAST:
 INSTALL_LIM=1
 INSTALL_SSC=1
 INSTALL_SCSAST=1
-INSTALL_SCSAST_SCANNER=1
 INSTALL_SCDAST=
 INSTALL_SCDAST_SCANNER=
 ```
@@ -79,7 +82,16 @@ INSTALL_SCDAST_SCANNER=
 It is recommended to set the components incrementally so you can see what's going on,
 for example: set just `INSTALL_LIM=1` first then add `INSTALL_SSC=1` and so on.
 
-**Do not place this file in source control.**
+The startup scripts creates and uses the same certificates across all of the components.
+A signing password is required and should be configured in the `.env` file:
+
+```
+SIGNING_PASSWORD=_YOUR_SIGNING_PASSWOD_
+```
+
+To generate your own password you can use the command `openssl rand -base64 32`.
+
+**Do not place the `.env` file in source control.**
 
 ## Install Fortify environment
 
@@ -129,25 +141,17 @@ exit
 exit
 ```
 
-### Configuring ScanCentral SAST/DAST in SSC
+## Populate environment
 
-To configurate ScanCentral SAST in SSC, first run the following command to forward the ScanCentral SAST Controller API
-to a free port on your local machine:
-
-```
-kubectl port-forward svc/scancentral-sast 8081:8080
-````
-
-Then in `Administration -> Configuration "Enable ScanCentral SAST"` set `Controller URL` to: `https://127.0.0.1:8081/scancentral-ctrl`.
-
-To configure ScanCentral DAST in SSC, first run the following command to forward the ScanCentral DAST API
-to a free port on your local machine:
+There is a script `populate.ps` that can be used to create some initial Applications, Versions and Issues.
+It uses the `fcli` tool to connect to the Fortify Environment. If you wish to use the `fcli` tool yourself
+you can use the "truststore" that has previously been created, for example:
 
 ```
-kubectl port-forward svc/scancentral-dast-core-api 1444:34785
-````
-
-Then in `Administration -> Configuration "Enable ScanCentral DAST"` set `Server URL` to: `https://127.0.0.1:1444`.
+fcli config truststore set -f certificates/ssc-service.jks -p changeit -t jks
+fcli ssc session login --url https://ssc.127-0-0-1.nip.io -k -u admin -p admin
+...
+```
 
 ## Update environment
 

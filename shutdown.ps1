@@ -4,9 +4,6 @@ Write-Host "Fortify minikube shutdown script"
 Import-Module $PSScriptRoot\modules\FortifyFunctions.psm1 -Scope Global -Force
 Set-PSPlatform
 
-# Setup Java Environment and Tools
-#Set-JavaTools
-
 & minikube stop
 
 & minikube delete

@@ -22,6 +22,7 @@ $TrustStore = Join-Path $CertDir -ChildPath "ssc-service.jks"
 fcli config truststore set -f $TrustStore -p changeit -t jks
 fcli ssc session login --url $SSC_URL -k -u $SSC_ADMIN_USER -p $SSC_ADMIN_PASSWORD
 
+Write-Host "Creating Applications and Versions ..."
 fcli ssc appversion create IWA-Java:1.0 --auto-required-attrs --issue-template Prioritized-HighRisk-Project-Template --skip-if-exists
 fcli ssc appversion create IWA-DotNet:1.0 --auto-required-attrs --issue-template Prioritized-HighRisk-Project-Template --skip-if-exists
 fcli ssc appversion create ZeroBank:1.0 --auto-required-attrs --issue-template Prioritized-HighRisk-Project-Template --skip-if-exists

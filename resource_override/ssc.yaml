@@ -1,0 +1,9 @@
+# Set all Kubernetes resources except for the datastores to best-effort mode (no resource requirements)
+# DO NOT null out the resource configuration for the 'datastore' containers, this will result in unexpected evictions due to how that service allocates memory.
+resources:
+  requests:
+    cpu: null
+    memory: null
+  limits:
+    cpu: null
+    memory: null

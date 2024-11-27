@@ -33,6 +33,7 @@ $SCANCENTRAL_VERSION = $EnvSettings['SCANCENTRAL_VERSION']
 $DEBRICKED_ACCESS_TOKEN = $EnvSettings['DEBRICKED_ACCESS_TOKEN']
 $LIM_HELM_VERSION = $EnvSettings['LIM_HELM_VERSION']
 $SSC_HELM_VERSION = $EnvSettings['SSC_HELM_VERSION']
+$SSC_IMAGE_TAG = $EnvSettings['SSC_IMAGE_TAG']
 $SCSAST_HELM_VERSION = $EnvSettings['SCSAST_HELM_VERSION']
 $SCDAST_HELM_VERSION = $EnvSettings['SCDAST_HELM_VERSION']
 $SCDAST_SCANNER_HELM_VERSION = $EnvSettings['SCDAST_SCANNER_HELM_VERSION']
@@ -55,6 +56,7 @@ if ([string]::IsNullOrEmpty($DEBRICKED_ACCESS_TOKEN)) { $DEBRICKED_ACCESS_TOKEN 
 if ([string]::IsNullOrEmpty($SCANCENTRAL_VERSION)) { $SCANCENTRAL_VERSION = "24.4.0" }
 if ([string]::IsNullOrEmpty($LIM_HELM_VERSION)) { $LIM_HELM_VERSION = "24.4.0-2" }
 if ([string]::IsNullOrEmpty($SSC_HELM_VERSION)) { $SSC_HELM_VERSION = "24.4.0-2" }
+if ([string]::IsNullOrEmpty($SSC_IMAGE_TAG)) { $SSC_IMAGE_TAG = "24.4.1.0005" }
 if ([string]::IsNullOrEmpty($SCSAST_HELM_VERSION)) { $SCSAST_HELM_VERSION = "24.4.0-2" }
 if ([string]::IsNullOrEmpty($SCDAST_HELM_VERSION)) { $SCDAST_HELM_VERSION = "24.4.0-2" }
 if ([string]::IsNullOrEmpty($MYSQL_HELM_VERSION)) { $MYSQL_HELM_VERSION = "9.3.1" }
@@ -131,7 +133,7 @@ $LIMInternalUrl = "https://lim:37562/"
 $SSCUrl = "ssc.$( $MinikubeIP.Replace('.','-') ).nip.io"
 $SSCInternalUrl = "https://ssc-service:443"
 $SCSASTUrl = "scsast.$( $MinikubeIP.Replace('.','-') ).nip.io"
-$SCSASTUrl = "https://..."
+$SCSASTInternalUrl = "https://scancentral-sast-controller:80..."
 $SCDASTAPIUrl = "scdastapi.$( $MinikubeIP.Replace('.','-') ).nip.io"
 $SCDASTAPIInternalUrl = "https://scancentral-dast-core-api:34785"
 $CertUrl = "/CN=*.$( $MinikubeIP.Replace('.','-') ).nip.io"
@@ -171,8 +173,8 @@ else
 
     & kubectl create secret tls wildcard-certificate --cert=certificate.pem --key=key.pem
 
-    #& "$KeytoolExe" -importkeystore -destkeystore ssc-service.jks -srckeystore keystore.p12 -srcstoretype pkcs12 -alias ssc -srcstorepass changeit -deststorepass changeit
-    #& "$KeytoolExe" -import -trustcacerts -file certificate.pem -alias "wildcard-cert" -keystore truststore -storepass changeit -noprompt
+    & keytool -importkeystore -destkeystore ssc-service.jks -srckeystore keystore.p12 -srcstoretype pkcs12 -alias ssc -srcstorepass changeit -deststorepass changeit
+    & keytool -import -trustcacerts -file certificate.pem -alias "wildcard-cert" -keystore truststore -storepass changeit -noprompt
 
     #$SRCKEYSTORE = Join-Path $PSScriptRoot -ChildPath "certificates" | Join-Path -ChildPath "keystore.p12"
     #$DESTKEYSTORE = Join-Path $JavaHome -ChildPath "lib" | Join-Path -ChildPath "security" | Join-Path -ChildPath "cacerts"
@@ -253,16 +255,23 @@ if ($InstallLIM)
             --set serverCertificate.certificateSecretName=lim-server-certificate `
             --set serverCertificate.certificatePasswordSecretName=lim-signing-server-certificate `
             --set signingCertificate.certificateSecretName=lim-signing-certificate `
-            --set signingCertificate.certificatePasswordSecretName=lim-signing-certificate-password
-
+            --set signingCertificate.certificatePasswordSecretName=lim-signing-certificate-password `
+            --set ingress.enabled=true `
+            --set ingress.hosts[0].host="$( $LIMUrl )" `
+            --set ingress.hosts[0].paths[0].path=/ `
+            --set ingress.hosts[0].paths[0].pathType=Prefix `
+            --set ingress.tls[0].secretName=wildcard-certificate `
+            --set ingress.tls[0].hosts[0]="$( $LIMUrl )" `
+            --set-string ingress.annotations.'nginx\.ingress\.kubernetes\.io\/proxy-body-size'="512M"
+            
         Write-Host
         $LIMStatus = Wait-UntilPodStatus -PodName lim-0
 
-        & kubectl create ingress lim-ingress `
-            --rule="$( $LIMUrl )/*=lim:37562,tls=wildcard-certificate" `
-            --annotation nginx.ingress.kubernetes.io/backend-protocol=HTTPS `
-            --annotation nginx.ingress.kubernetes.io/proxy-body-size='0' `
-            --annotation nginx.ingress.kubernetes.io/client-max-body-size='512M'
+        #& kubectl create ingress lim-ingress `
+        #    --rule="$( $LIMUrl )/*=lim:37562,tls=wildcard-certificate" `
+        #    --annotation nginx.ingress.kubernetes.io/backend-protocol=HTTPS `
+        #    --annotation nginx.ingress.kubernetes.io/proxy-body-size='0' `
+        #    --annotation nginx.ingress.kubernetes.io/client-max-body-size='512M'
 
         if ($LIMStatus -eq "Running")
         {
@@ -326,11 +335,12 @@ if ($InstallSSC)
 
         Set-Location $PSScriptRoot
 
+        $ResourceOverride = Join-Path $ResourceOverrideDir -ChildPath "ssc.yaml"
         helm install ssc oci://registry-1.docker.io/fortifydocker/helm-ssc --version $SSC_HELM_VERSION `
+            --timeout 60m -f $ResourceOverride `
             --set urlHost="$( $SSCUrl )" `
             --set imagePullSecrets[0].name=fortifydocker `
-            --set image.repository="fortifydocker/ssc-webapp" `
-            --set image.tag="24.4.1.0005" `
+            --set image.tag="$( $SSC_IMAGE_TAG )" `
             --set secretRef.name=ssc `
             --set secretRef.keys.sscLicenseEntry=fortify.license `
             --set secretRef.keys.sscAutoconfigEntry=ssc.autoconfig `
@@ -338,8 +348,7 @@ if ($InstallSSC)
             --set secretRef.keys.httpCertificateKeystorePasswordEntry=ssc-service.jks.password `
             --set secretRef.keys.httpCertificateKeyPasswordEntry=ssc-service.jks.key.password `
             --set secretRef.keys.jvmTruststoreFileEntry=truststore `
-            --set secretRef.keys.jmvTruststorePasswordEntry=truststore.password `
-            --set resources=null
+            --set secretRef.keys.jmvTruststorePasswordEntry=truststore.password
 
         Write-Host 
         $SSCStatus = Wait-UntilPodStatus -PodName ssc-webapp-0
@@ -373,24 +382,26 @@ if ($InstallSCSAST)
     {
         Write-Host "Installing ScanCentral SAST ..."
 
-        helm install scancentral-sast fortify/scancentral-sast --version $SCSAST_HELM_VERSION `
+        $CertPem = Join-Path $CertDir -ChildPath "certificate.pem"
+        $ResourceOverride = Join-Path $ResourceOverrideDir -ChildPath "sast.yaml"
+        helm install scancentral-sast oci://registry-1.docker.io/fortifydocker/helm-scancentral-sast --version $SCSAST_HELM_VERSION `
+            --timeout 60m -f $ResourceOverride `
             --set imagePullSecrets[0].name=fortifydocker `
-            --set-file fortifyLicense=fortify.license `
-            --set controller.thisUrl="$( $SCSASTUrl )" `
-            --set controller.sscUrl="$( $SSCInternalUrl )" `
-            --set-file trustedCertificates[0]=certificates/certificate.pem `
+            --set-file secrets.fortifyLicense=fortify.license `
+            --set controller.thisUrl="https://$( $SCSASTUrl )/scancentral-ctrl" `
+            --set controller.sscUrl="https://$( $SSCInternalUrl )" `
+            --set-file trustedCertificates[0]=$CertPem `
             --set controller.persistence.enabled=false `
             --set controller.ingress.enabled=true `
             --set controller.ingress.hosts[0].host="$( $SCSASTUrl )" `
             --set controller.ingress.hosts[0].paths[0].path=/ `
             --set controller.ingress.hosts[0].paths[0].pathType=Prefix `
             --set controller.ingress.tls[0].secretName=wildcard-certificate `
-            --set controller.ingress.tls[0].hosts[0]=$( $SCSASTUrl ) `
-            --set controller.ingress.annotations."nginx\.ingress\.kubernetes\.io/proxy-body-size"="512m"
-
+            --set controller.ingress.tls[0].hosts[0]="$( $SCSASTUrl )" `
+            --set-string controller.ingress.annotations.'nginx\.ingress\.kubernetes\.io\/proxy-body-size'="512M"
+            
         Write-Host
         $SCSastControllerStatus = Wait-UntilPodStatus -PodName scancentral-sast-controller-0
-        $SCSastWorkerStatus = Wait-UntilPodStatus -PodName scancentral-sast-worker-linux-0
 
         if ($SCSastControllerStatus -eq "Running")
         {
@@ -401,11 +412,14 @@ if ($InstallSCSAST)
             $ScanCentralCtrlSecretBase64 = (& kubectl get secret scancentral-sast -o jsonpath="{.data.scancentral-ssc-scancentral-ctrl-secret}")
             $ScanCentralCtrlSecret = [System.Text.Encoding]::ASCII.GetString([System.Convert]::FromBase64String($ScanCentralCtrlSecretBase64))
 
-            Update-EnvFile -File $EnvFile -Find "^SCSAST_URL=.*$" -Replace "SCSAST_URL=https://$( $SCSASTUrl )/scancentral-ctrl/"
+            Update-EnvFile -File $EnvFile -Find "^SCSAST_URL=.*$" -Replace "SCSAST_URL=https://$( $SCSASTUrl )/scancentral-ctrl"
             Update-EnvFile -File $EnvFile -Find "^CLIENT_AUTH_TOKEN=.*$" -Replace "CLIENT_AUTH_TOKEN=$( $ClientAuthToken )"
             Update-EnvFile -File $EnvFile -Find "^WORKER_AUTH_TOKEN=.*$" -Replace "WORKER_AUTH_TOKEN=$( $WorkerAuthToken )"
             Update-EnvFile -File $EnvFile -Find "^SHARED_SECRET=.*$" -Replace "SHARED_SECRET=$( $ScanCentralCtrlSecret )"
         }
+
+        $SCSastWorkerStatus = Wait-UntilPodStatus -PodName scancentral-sast-worker-linux-0
+
     }
 }
 
@@ -521,10 +535,10 @@ if ($InstallSCDAST)
         $SCDastControllerStatus = Wait-UntilPodStatus -PodName scancentral-dast-core-api-0
 
         kubectl create ingress scdastapi-ingress `
-        --rule="$( $SCDASTAPIUrl )/*=scancentral-dast-core-api:34785,tls=wildcard-certificate" `
-        --annotation nginx.ingress.kubernetes.io/backend-protocol=HTTPS `
-        --annotation nginx.ingress.kubernetes.io/proxy-body-size='0' `
-        --annotation nginx.ingress.kubernetes.io/client-max-body-size='512M'
+            --rule="$( $SCDASTAPIUrl )/*=scancentral-dast-core-api:34785,tls=wildcard-certificate" `
+            --annotation nginx.ingress.kubernetes.io/backend-protocol=HTTPS `
+            --annotation nginx.ingress.kubernetes.io/proxy-body-size='0' `
+            --annotation nginx.ingress.kubernetes.io/client-max-body-size='512M'
 
         if ($SCDastControllerStatus -eq "Running")
         {
@@ -567,11 +581,7 @@ if ($InstallSCDASTScanner)
 Write-Host @"
 ================================================================================
 
-To access LIM : https://$( $LIMUrl )
-To access SSC : https://$( $SSCUrl )
-
-ScanCentral DAST API : https://$( $SCDASTAPIUrl )
-ScanCentral SAST Controller : https://$( $SCSASTControllerUrl )
+Please refer to the ".env" file for details of URLs and Tokens.
 
 Note: after Enabling ScanCentral SAST/DAST from SSC you can restart SSC pod with:
 
