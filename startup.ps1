@@ -124,7 +124,7 @@ if ($IsLinux)
     $IsWSL = (systemd-detect-virt)
     if ($IsWSL -eq "wsl")
     {
-        $MiniKubeIP = "127.0.0.1"
+        $MinikubeIP = "127.0.0.1"
     }
 
 }
@@ -133,7 +133,7 @@ $LIMInternalUrl = "https://lim:37562/"
 $SSCUrl = "ssc.$( $MinikubeIP.Replace('.','-') ).nip.io"
 $SSCInternalUrl = "https://ssc-service:443"
 $SCSASTUrl = "scsast.$( $MinikubeIP.Replace('.','-') ).nip.io"
-$SCSASTInternalUrl = "https://scancentral-sast-controller:80..."
+$SCSASTInternalUrl = "https://scancentral-sast-controller:80"
 $SCDASTAPIUrl = "scdastapi.$( $MinikubeIP.Replace('.','-') ).nip.io"
 $SCDASTAPIInternalUrl = "https://scancentral-dast-core-api:34785"
 $CertUrl = "/CN=*.$( $MinikubeIP.Replace('.','-') ).nip.io"
@@ -255,23 +255,16 @@ if ($InstallLIM)
             --set serverCertificate.certificateSecretName=lim-server-certificate `
             --set serverCertificate.certificatePasswordSecretName=lim-signing-server-certificate `
             --set signingCertificate.certificateSecretName=lim-signing-certificate `
-            --set signingCertificate.certificatePasswordSecretName=lim-signing-certificate-password `
-            --set ingress.enabled=true `
-            --set ingress.hosts[0].host="$( $LIMUrl )" `
-            --set ingress.hosts[0].paths[0].path=/ `
-            --set ingress.hosts[0].paths[0].pathType=Prefix `
-            --set ingress.tls[0].secretName=wildcard-certificate `
-            --set ingress.tls[0].hosts[0]="$( $LIMUrl )" `
-            --set-string ingress.annotations.'nginx\.ingress\.kubernetes\.io\/proxy-body-size'="512M"
+            --set signingCertificate.certificatePasswordSecretName=lim-signing-certificate-password
             
         Write-Host
         $LIMStatus = Wait-UntilPodStatus -PodName lim-0
 
-        #& kubectl create ingress lim-ingress `
-        #    --rule="$( $LIMUrl )/*=lim:37562,tls=wildcard-certificate" `
-        #    --annotation nginx.ingress.kubernetes.io/backend-protocol=HTTPS `
-        #    --annotation nginx.ingress.kubernetes.io/proxy-body-size='0' `
-        #    --annotation nginx.ingress.kubernetes.io/client-max-body-size='512M'
+        & kubectl create ingress lim-ingress `
+            --rule="$( $LIMUrl )/*=lim:37562,tls=wildcard-certificate" `
+            --annotation nginx.ingress.kubernetes.io/backend-protocol=HTTPS `
+            --annotation nginx.ingress.kubernetes.io/proxy-body-size='0' `
+            --annotation nginx.ingress.kubernetes.io/client-max-body-size='512M'
 
         if ($LIMStatus -eq "Running")
         {
@@ -382,14 +375,15 @@ if ($InstallSCSAST)
     {
         Write-Host "Installing ScanCentral SAST ..."
 
+        #$SSCServiceIP = (kubectl get service/ssc-service -o jsonpath='{.spec.clusterIP}')
         $CertPem = Join-Path $CertDir -ChildPath "certificate.pem"
         $ResourceOverride = Join-Path $ResourceOverrideDir -ChildPath "sast.yaml"
         helm install scancentral-sast oci://registry-1.docker.io/fortifydocker/helm-scancentral-sast --version $SCSAST_HELM_VERSION `
             --timeout 60m -f $ResourceOverride `
             --set imagePullSecrets[0].name=fortifydocker `
             --set-file secrets.fortifyLicense=fortify.license `
-            --set controller.thisUrl="https://$( $SCSASTUrl )/scancentral-ctrl" `
-            --set controller.sscUrl="https://$( $SSCInternalUrl )" `
+            --set controller.thisUrl="https://$( $SCSASTUrl )" `
+            --set controller.sscUrl="$( $SSCInternalUrl )" `
             --set-file trustedCertificates[0]=$CertPem `
             --set controller.persistence.enabled=false `
             --set controller.ingress.enabled=true `

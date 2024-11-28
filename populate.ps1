@@ -21,6 +21,7 @@ $TrustStore = Join-Path $CertDir -ChildPath "ssc-service.jks"
 
 fcli config truststore set -f $TrustStore -p changeit -t jks
 fcli ssc session login --url $SSC_URL -k -u $SSC_ADMIN_USER -p $SSC_ADMIN_PASSWORD
+#fcli sc-sast session login --ssc-url https://ssc.127-0-0-1.nip.io/ --ctrl-url https://scsast.127-0-0-1.nip.io/scancentral-ctrl/ -k -c VmR99MAU5UIiTPOPdvpkFrYjkqf8loyYTOhOPjMUEvGHAVDW
 
 Write-Host "Creating Applications and Versions ..."
 fcli ssc appversion create IWA-Java:1.0 --auto-required-attrs --issue-template Prioritized-HighRisk-Project-Template --skip-if-exists

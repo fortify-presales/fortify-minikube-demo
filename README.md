@@ -80,7 +80,9 @@ INSTALL_SCDAST_SCANNER=
 ```
 
 It is recommended to set the components incrementally so you can see what's going on,
-for example: set just `INSTALL_LIM=1` first then add `INSTALL_SSC=1` and so on.
+for example: set just `INSTALL_LIM=1` first then add `INSTALL_SSC=1` and so on. In particular
+a ScanCentral DAST activation token needs to be installed in the LIM for the SecureBase
+database to be installed successfully.
 
 The startup scripts creates and uses the same certificates across all of the components.
 A signing password is required and should be configured in the `.env` file:
@@ -156,6 +158,15 @@ fcli ssc session login --url https://ssc.127-0-0-1.nip.io -k -u admin -p admin
 ## Update environment
 
 You can re-run the `startup.ps1` script with different options set in the `.env` to deploy more components.
+
+## Example commands
+
+SSC
+Login:      `kubectl exec --stdin --tty ssc-webapp-0 -- /bin/bash`
+Restart:    `kubectl delete pod ssc-webapp-0`
+ScanCentral SAST Controller
+Login:      `kubectl exec --stdin --tty scancentral-sast-controller-0 -- /bin/bash`
+Restart:    `kubectl delete pod scancentral-sast-controller-0`
 
 ## Stopping/Starting Minikube
 
