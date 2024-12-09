@@ -7,10 +7,11 @@ Minikube is a tool that allows you to run a single-node Kubernetes cluster local
 It is useful for developing and testing applications that are designed to run on Kubernetes.
 
 It includes a deployment of:
- [ ] Fortify License Infrastructure Manger (LIM)
- [ ] Fortify Software Security Center (SSC)
- [ ] ScanCentral SAST
- [ ] ScanCentral DAST
+
+    [X] Fortify License Infrastructure Manger (LIM)
+    [X] Fortify Software Security Center (SSC)
+    [X] ScanCentral SAST and Linux Scanner/Sensor
+    [X] ScanCentral DAST and Linux Scanner/Sensor
 
 ## Prerequisites
 
@@ -21,42 +22,42 @@ See [here](https://gist.github.com/wholroyd/748e09ca0b78897750791172b2abb051) as
 ### PowerShell on Linux
 
 Install [PowerShell for Linux](https://learn.microsoft.com/en-us/powershell/scripting/install/installing-powershell-on-linux?view=powershell-7.4).
-The scripts are written in PowerShell so that they could be used on Windows and Linux.
+The scripts are written in PowerShell so that they could be used on both Windows and Linux.
 
 ### Kubernetes command line
 
-Install **kubectl**: https://kubernetes.io/docs/tasks/tools/
+Install **kubectl** by following: https://kubernetes.io/docs/tasks/tools/
 
 ### Helm
 
-Install **helm**: https://helm.sh/docs/intro/install/
+Install **helm** by following: https://helm.sh/docs/intro/install/
 
 ### Minikube
 
-Install **minikube**: https://minikube.sigs.k8s.io/docs/start
+Install **minikube** by following : https://minikube.sigs.k8s.io/docs/start
 
 ### OpenSSL
 
 You will need OpenSSL (https://www.openssl.org/) to create a self-signed wildcard certificate. You can install OpenSSL 
-using the OS package manager or use the version that is already available with the Git command line tool.
+using your OS package manager or use the version that is already available with the Git command line tool. If using Linux there is a good chance that OpenSSL is already installed.
 
 ### fortify.license file
 
-A working **fortify.license** file for SSC and ScanCentral SAST.
+A working **fortify.license** file will be need for SSC and ScanCentral SAST.
 Place this file in the "root" directory of this project.
 
 ### Dockerhub ***fortifydocker*** credentials
 
 You will need Docker Hub credentials to access the Helm charts and private docker images in the [fortifydocker](https://hub.docker.com/u/fortifydocker) organisation.
-Enter the username and password into the `.env` file (see below)
+Enter the username and password into the `.env` file (see below).
 
 ### ScanCentral DAST and WebInspect licenses
 
-A working license for ScanCentral DAST and WebInspect if deploying ScanCentral DAST 
+A working license for ScanCentral DAST and WebInspect will be needed if deploying ScanCentral DAST.
 
 ### Fortify Command Line utility
 
-The `fcli` tool will be used to populate data and connect to the Fortify Environment.
+The `fcli` tool can be used to populate data and connect to the Fortify minikube Environment.
 
 ## Environment preparation
 
@@ -66,7 +67,7 @@ Copy the file `env.example` to `.env`, e.g.
 cp env-example .env
 ```
 
-then edit the file as required. Set the first few entries depending on which components
+then edit the file as required. Set the first few entries/flags depending on which components
 you wish to install. For example to install everything except ScanCentral DAST:
 
 ```
@@ -79,19 +80,18 @@ INSTALL_SCDAST=
 INSTALL_SCDAST_SCANNER=
 ```
 
-It is recommended to set the components incrementally so you can see what's going on,
-for example: set just `INSTALL_LIM=1` first then add `INSTALL_SSC=1` and so on. In particular
-a ScanCentral DAST activation token needs to be installed in the LIM for the SecureBase
-database to be installed successfully.
+It is recommended to set the components incrementally so you can see what's going on and make sure things are working. For example: set just `INSTALL_LIM=1` first to install LIM and configure licenses then add `INSTALL_SSC=1` and so on. 
 
-The startup scripts creates and uses the same certificates across all of the components.
-A signing password is required and should be configured in the `.env` file:
+Note: a ScanCentral DAST activation token needs to be installed in the LIM for the SecureBase database to be installed successfully.
+
+To save time, the startup scripts creates and uses the same certificates across all of the components.
+A single signing password is required and should be configured in the `.env` file:
 
 ```
 SIGNING_PASSWORD=_YOUR_SIGNING_PASSWOD_
 ```
 
-To generate your own password you can use the command `openssl rand -base64 32`.
+To generate your own signing password you can use the command `openssl rand -base64 32`.
 
 **Do not place the `.env` file in source control.**
 
@@ -100,7 +100,8 @@ To generate your own password you can use the command `openssl rand -base64 32`.
 Run the following command to start minikube and create the Fortify Environment:
 
 ```aidl
-pwsh ./startup.ps1
+pwsh 
+./startup.ps1
 ```
 
 It will take a while for everything to complete. If you want to see the progress and ensure everything
@@ -111,14 +112,15 @@ minikube dashboard
 ```
 
 and browse to the URL it displays. Once the services have started you can expose them to your local
-machine (if using WSL for example) using the following command:
+machine using the following command:
 
 ```
 minikube tunnel
 ```
 
-You might need to enter your (sudo) password. 
-The command prompt running this tunnel will need to be kep open while you are using the Fortify web applications.
+You might need to enter your (sudo) password for this to work.
+
+Note: the command prompt running this tunnel will need to be kept open while you are using the Fortify web UI applications.
 
 ## Installing Licenses in LIM
 
@@ -130,8 +132,7 @@ values of `LIM_ADMIN_USER` and `LIM_ADMIN_PASSWORD` set in `.env`.
 Browse to https://127.0.0.1:8443 on your local machine and login using the values of `SSC_ADMIN_USER` and
 `SSCADMIN_PASSWORD` set in `.env`.
 
-Note: if you want to keep the SSC "admin" user's default password of `admin` you can run the following commands
-before logging in:
+Note: if you want to keep the SSC "admin" user's default password of `admin` you can run the following commands to update the MySQL database before logging in:
 
 ```aidl
 kubectl exec --stdin --tty mysql-0 -- /bin/bash
@@ -143,9 +144,23 @@ exit
 exit
 ```
 
+## ScanCentral SAST and DAST Configuration in SSC
+
+For ScanCentral SAST, you should use the "internal" URL for the ScanCentral DAST controller, e.g.
+`http://scancentral-sast-controller:80/scancentral-ctrl` and the `SHARED_SECRET` value populated
+in the `.env` file. You will need to restart SSC for this configuration to take affect using:
+
+```
+kubectl delete pod ssc-webapp-0
+```
+
+For ScanCentral DAST, you should use the "external" URL for the ScanCentral DAST API, e.g.
+`https://scdastapi.127-0-0-1.nip.io`. You will need to refresh your browser for the ScanCentral
+DAST view to appear.
+
 ## Populate environment
 
-There is a script `populate.ps` that can be used to create some initial Applications, Versions and Issues.
+There is a script `populate.ps1` that can be used to create some initial Applications, Versions and Issues.
 It uses the `fcli` tool to connect to the Fortify Environment. If you wish to use the `fcli` tool yourself
 you can use the "truststore" that has previously been created, for example:
 
@@ -153,20 +168,27 @@ you can use the "truststore" that has previously been created, for example:
 fcli config truststore set -f certificates/ssc-service.jks -p changeit -t jks
 fcli ssc session login --url https://ssc.127-0-0-1.nip.io -k -u admin -p admin
 ...
+..._your fcli commands_...
+...
+fcli ssc session login
 ```
 
 ## Update environment
 
-You can re-run the `startup.ps1` script with different options set in the `.env` to deploy more components.
+You can re-run the `startup.ps1` script with different options set in the `.env` file to deploy additional Fortify components.
 
 ## Example commands
 
-SSC
-Login:      `kubectl exec --stdin --tty ssc-webapp-0 -- /bin/bash`
-Restart:    `kubectl delete pod ssc-webapp-0`
-ScanCentral SAST Controller
-Login:      `kubectl exec --stdin --tty scancentral-sast-controller-0 -- /bin/bash`
-Restart:    `kubectl delete pod scancentral-sast-controller-0`
+Here are some additional kubernetes commands to help you:
+
+|                               |      |
+|-------------------------------|------|
+|Exec into SSC pod              |`kubectl exec --stdin --tty ssc-webapp-0 -- /bin/bash`|
+|Restart SSC pod                |`kubectl delete pod ssc-webapp-0`|
+|Exec into ScanCentral SAST pod |`kubectl exec --stdin --tty scancentral-sast-controller-0 -- /bin/bash`|
+|Restart ScanCentral SAST pod   |`kubectl delete pod scancentral-sast-controller-0`|
+|Exec into ScanCentral SAST sensor  | `kubectl exec --stdin --tty scancentral-sast-worker-linux-0 -- /bin/bash`|
+|Exec into ScanCentral DAST sensor  | `kubectl exec --stdin --tty scancentral-dast-scanner-0 -- /bin/bash` |
 
 ## Stopping/Starting Minikube
 
@@ -176,16 +198,18 @@ You can stop minikube using:
 minikube stop
 ```
 
-this will keep the kubernetes cluster so that even after reboot of your machine you can restart the cluster with:
+Note: this will keep the kubernetes cluster so that even after reboot of your machine you can restart the cluster with:
 
 ```
 minikube start
 ```
+
+You may need to restart the SSC pod once more after restarting the cluster.
 
 ## Remove Fortify environment
 
 If you wish to remove the minikube environment completely, you can use the following command:
 
 ```aidl
-pwsh ./shutdown.ps1
+./shutdown.ps1
 ```

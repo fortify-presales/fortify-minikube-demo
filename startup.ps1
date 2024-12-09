@@ -133,7 +133,7 @@ $LIMInternalUrl = "https://lim:37562/"
 $SSCUrl = "ssc.$( $MinikubeIP.Replace('.','-') ).nip.io"
 $SSCInternalUrl = "https://ssc-service:443"
 $SCSASTUrl = "scsast.$( $MinikubeIP.Replace('.','-') ).nip.io"
-$SCSASTInternalUrl = "https://scancentral-sast-controller:80"
+$SCSASTInternalUrl = "http://scancentral-sast-controller:80"
 $SCDASTAPIUrl = "scdastapi.$( $MinikubeIP.Replace('.','-') ).nip.io"
 $SCDASTAPIInternalUrl = "https://scancentral-dast-core-api:34785"
 $CertUrl = "/CN=*.$( $MinikubeIP.Replace('.','-') ).nip.io"
@@ -375,15 +375,16 @@ if ($InstallSCSAST)
     {
         Write-Host "Installing ScanCentral SAST ..."
 
-        #$SSCServiceIP = (kubectl get service/ssc-service -o jsonpath='{.spec.clusterIP}')
+        $SSCServiceIP = (kubectl get service/ssc-service -o jsonpath='{.spec.clusterIP}')
         $CertPem = Join-Path $CertDir -ChildPath "certificate.pem"
         $ResourceOverride = Join-Path $ResourceOverrideDir -ChildPath "sast.yaml"
         helm install scancentral-sast oci://registry-1.docker.io/fortifydocker/helm-scancentral-sast --version $SCSAST_HELM_VERSION `
             --timeout 60m -f $ResourceOverride `
             --set imagePullSecrets[0].name=fortifydocker `
             --set-file secrets.fortifyLicense=fortify.license `
-            --set controller.thisUrl="https://$( $SCSASTUrl )" `
+            --set controller.thisUrl="$( $SCSASTInternalUrl )" `
             --set controller.sscUrl="$( $SSCInternalUrl )" `
+            --set controller.sscRemoteIp="10.0.0.0/8" `
             --set-file trustedCertificates[0]=$CertPem `
             --set controller.persistence.enabled=false `
             --set controller.ingress.enabled=true `
