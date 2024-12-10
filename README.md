@@ -189,6 +189,8 @@ Here are some additional kubernetes commands to help you:
 |Restart ScanCentral SAST pod   |`kubectl delete pod scancentral-sast-controller-0`|
 |Exec into ScanCentral SAST sensor  | `kubectl exec --stdin --tty scancentral-sast-worker-linux-0 -- /bin/bash`|
 |Exec into ScanCentral DAST sensor  | `kubectl exec --stdin --tty scancentral-dast-scanner-0 -- /bin/bash` |
+|minikube list containers       | `minikube ssh docker container ls` |
+|minikube exec into container (root)| `minikube ssh "docker container exec -it -u 0 <Container ID> /bin/bash"` |
 
 ## Stopping/Starting Minikube
 

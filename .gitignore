@@ -32,5 +32,3 @@ helm-scancentral-dast-scanner
 helm-scancentral-sast
 *.tgz
 fcli.env
-*.fpr
-jdk-17-jre-linux-x64/lib/security/cacerts
