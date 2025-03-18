@@ -22,6 +22,13 @@ function Set-JavaTools
     {
         Write-Host "Running on Linux ..."
         $JavaHome = Join-Path $RootPath -ChildPath "jdk-17-jre-linux-x64"
+        if (-not(Test-Path -PathType container $JavaHome))
+        {
+            Write-Host "Installing local JRE ..."
+            $DownloadUri = "https://builds.openlogic.com/downloadJDK/openlogic-openjdk-jre/17.0.8+7/openlogic-openjdk-jre-17.0.8+7-linux-x64.tar.gz"
+            Invoke-WebRequest -Uri $DownloadUri -OutFile jdk-17-jre-linux-x64.tar.gz
+            Expand-Archive -Path jdk-17-jre-linux-x64.zip -DestinationPath jdk-17-jre-linux-x64.zip
+        }
         $JavaBin = Join-Path $JavaHome -ChildPath "bin"
         $JavaExe = Join-Path $JavaBin -ChildPath "java"
         $KeytoolExe = Join-Path $JavaBin -ChildPath "keytool"
@@ -30,6 +37,10 @@ function Set-JavaTools
     {
         Write-Host "Running on Windows ..."
         $JavaHome = Join-Path $RootPath -ChildPath "jdk-17-jre-windows-x64"
+        if (-not(Test-Path -PathType container $JavaHome))
+        {
+            Write-Host "Installing local JRE ..."
+        }
         $JavaBin = Join-Path $JavaHome -ChildPath "bin"
         $JavaExe = Join-Path $JavaBin -ChildPath "java.exe"
         $KeytoolExe = Join-Path $JavaBin -ChildPath "keytool.exe"

@@ -16,10 +16,10 @@ SSC_ADMIN_PASSWORD=admin
 # DockerHub login credentials to fortifydocker organisation
 DOCKERHUB_USERNAME=_YOUR_DOCKERHUB_USERNAME_
 DOCKERHUB_PASSWORD=_YOUR_DOCKERHUB_PASSWORD_
-# Path to openssl - use OpenSSL from Git on Windows
-#OPENSSL_PATH=C:\\Program Files\\Git\\mingw64\\bin\\openssl.exe
+# Path to openssl on Windows - example when OpenSSL for Windows installed
+OPENSSL_PATH=C:\\Program Files\\OpenSSL-Win64\\bin\\openssl.exe
 # Path to openssl on Linux
-OPENSSL_PATH=/usr/bin/openssl
+#OPENSSL_PATH=/usr/bin/openssl
 # Version on ScanCentral to use
 SCANCENTRAL_VERSION=24.4
 # Fortify Demo App to create
@@ -35,8 +35,6 @@ DEBRICKED_ACCESS_TOKEN=_YOUR_DEBRICKED_ACCESS_TOKEN_
 # Version of Helm charts to ise
 LIM_HELM_VERSION=24.4.0-2
 SSC_HELM_VERSION=24.4.0-2
-# needed as default version in helm chart does not exist!
-SSC_IMAGE_TAG=24.4.1.0005
 SCSAST_HELM_VERSION=24.4.0-2
 SCDAST_HELM_VERSION=24.4.0-2
 SCDAST_SCANNER_HELM_VERSION=24.4.0-2

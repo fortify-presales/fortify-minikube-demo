@@ -33,7 +33,6 @@ $SCANCENTRAL_VERSION = $EnvSettings['SCANCENTRAL_VERSION']
 $DEBRICKED_ACCESS_TOKEN = $EnvSettings['DEBRICKED_ACCESS_TOKEN']
 $LIM_HELM_VERSION = $EnvSettings['LIM_HELM_VERSION']
 $SSC_HELM_VERSION = $EnvSettings['SSC_HELM_VERSION']
-$SSC_IMAGE_TAG = $EnvSettings['SSC_IMAGE_TAG']
 $SCSAST_HELM_VERSION = $EnvSettings['SCSAST_HELM_VERSION']
 $SCDAST_HELM_VERSION = $EnvSettings['SCDAST_HELM_VERSION']
 $SCDAST_SCANNER_HELM_VERSION = $EnvSettings['SCDAST_SCANNER_HELM_VERSION']
@@ -56,7 +55,6 @@ if ([string]::IsNullOrEmpty($DEBRICKED_ACCESS_TOKEN)) { $DEBRICKED_ACCESS_TOKEN 
 if ([string]::IsNullOrEmpty($SCANCENTRAL_VERSION)) { $SCANCENTRAL_VERSION = "24.4.0" }
 if ([string]::IsNullOrEmpty($LIM_HELM_VERSION)) { $LIM_HELM_VERSION = "24.4.0-2" }
 if ([string]::IsNullOrEmpty($SSC_HELM_VERSION)) { $SSC_HELM_VERSION = "24.4.0-2" }
-if ([string]::IsNullOrEmpty($SSC_IMAGE_TAG)) { $SSC_IMAGE_TAG = "24.4.1.0005" }
 if ([string]::IsNullOrEmpty($SCSAST_HELM_VERSION)) { $SCSAST_HELM_VERSION = "24.4.0-2" }
 if ([string]::IsNullOrEmpty($SCDAST_HELM_VERSION)) { $SCDAST_HELM_VERSION = "24.4.0-2" }
 if ([string]::IsNullOrEmpty($MYSQL_HELM_VERSION)) { $MYSQL_HELM_VERSION = "9.3.1" }
@@ -87,15 +85,17 @@ if ($InstallSCDAST)
 }
 if ($IsLinux)
 {
-    $MinikubeDriver = "docker"
+    $MinikubeDriver="docker"
     $UseStaticIP="--static-ip=192.168.200.200"
     $UsePorts=""
+    $Switch=""
 }
 else
 {
-    $MinikubeDriver = "hyperv"
-    $UseStaticIP = ""
-    $UsePorts = ""
+    $MinikubeDriver="hyperv"
+    $UseStaticIP=""
+    $UsePorts=""
+    $Switch="--hyperv-use-external-switch"
 }
 
 # Setup Java Environment and Tools
@@ -110,7 +110,7 @@ if ($MinikubeStatus -eq "Running")
 else
 {
     Write-Host "minikube not running ... starting ..."
-    & minikube start --memory $MINIKUBE_MEM --cpus $MINIKUBE_CPUS --driver=$MinikubeDriver $UseStaticIP $UsePorts
+    & minikube start --memory $MINIKUBE_MEM --cpus $MINIKUBE_CPUS --driver=$MinikubeDriver $UseStaticIP $UsePorts $Switch
     Start-Sleep -Seconds 5
     & minikube addons enable ingress
     & minikube addons enable metrics-server
@@ -333,7 +333,6 @@ if ($InstallSSC)
             --timeout 60m -f $ResourceOverride `
             --set urlHost="$( $SSCUrl )" `
             --set imagePullSecrets[0].name=fortifydocker `
-            --set image.tag="$( $SSC_IMAGE_TAG )" `
             --set secretRef.name=ssc `
             --set secretRef.keys.sscLicenseEntry=fortify.license `
             --set secretRef.keys.sscAutoconfigEntry=ssc.autoconfig `
