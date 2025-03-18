@@ -6,6 +6,12 @@ param (
     [switch]$RecreateCertificates
 )
 
+# Uncomment if you wish to use a non-default Minikune home directory
+# Unix
+#export MINIKUBE_HOME=/otherdrive/.minikube
+# Windows
+#$env:MINIKUBE_HOME = "D:\.minikube"
+
 Write-Host "Fortify minikube startup script"
 
 # Import some supporting functions
@@ -86,16 +92,19 @@ if ($InstallSCDAST)
 if ($IsLinux)
 {
     $MinikubeDriver="docker"
+    $MinikubeDiskSize="40GB"
     $UseStaticIP="--static-ip=192.168.200.200"
     $UsePorts=""
-    $Switch=""
+    $UseSwitch=""
+    $DiskSize="--disk-size 20GB"
 }
 else
 {
     $MinikubeDriver="hyperv"
+    $MinikubeDiskSize="40GB"
     $UseStaticIP=""
     $UsePorts=""
-    $Switch="--hyperv-use-external-switch"
+    $UseSwitch="--hyperv-use-external-switch"
 }
 
 # Setup Java Environment and Tools
@@ -110,7 +119,7 @@ if ($MinikubeStatus -eq "Running")
 else
 {
     Write-Host "minikube not running ... starting ..."
-    & minikube start --memory $MINIKUBE_MEM --cpus $MINIKUBE_CPUS --driver=$MinikubeDriver $UseStaticIP $UsePorts $Switch
+    & minikube start --memory $MINIKUBE_MEM --cpus $MINIKUBE_CPUS --driver=$MinikubeDriver --disk-size=$MinikubeDiskSize $UseStaticIP $UsePorts $UseSwitch
     Start-Sleep -Seconds 5
     & minikube addons enable ingress
     & minikube addons enable metrics-server

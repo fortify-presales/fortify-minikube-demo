@@ -61,6 +61,17 @@ The `fcli` tool can be used to populate data and connect to the Fortify minikube
 
 ## Environment preparation
 
+If you wish for Minikube to use a different drive or location than its default, you should set the MINIKUBE_HOME
+environment variable, for example:
+
+``
+# Unix
+export MINIKUBE_HOME=/otherdrive/.minikube
+# Windows
+$env:MINIKUBE_HOME = "D:\.minikube"
+``
+Both of these entries are at the top in the `startup.ps1` script and you can uncomment out the relevant if required.
+
 Copy the file `env.example` to `.env`, e.g.
 
 ```
